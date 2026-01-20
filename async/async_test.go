@@ -13,3 +13,13 @@ func TestPool(t *testing.T) {
 	})
 	aa.Stop()
 }
+
+func TestAsync(t *testing.T) {
+	aa := NewAsync()
+	aa.Start()
+	aa.Push(func() {
+		t.Log("----1-----")
+	})
+	aa.Done()
+	aa.Wait()
+}
