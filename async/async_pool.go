@@ -6,14 +6,15 @@ import (
 )
 
 type AsyncPool struct {
-	sync.WaitGroup
-	size   int            // 协程数量
-	id     uint64         // 唯一id
-	status int32          // 状态
-	queue  *Queue[func()] // 任务队列
+	once   sync.Once
+	group  sync.WaitGroup
 	list   chan func()    // 任务抢占队列
+	queue  *Queue[func()] // 任务队列
 	notify chan struct{}  // 通知
 	exit   chan struct{}  // 退出
+	id     uint64         // 唯一id
+	status int32          // 状态
+	size   int            // 协程数量
 }
 
 func NewAsyncPool(size int) *AsyncPool {
@@ -40,23 +41,31 @@ func (d *AsyncPool) SetId(id uint64) {
 
 func (d *AsyncPool) Start() {
 	if atomic.CompareAndSwapInt32(&d.status, 0, 1) {
-		d.Add(1)
-		go d.run()
-		for i := 0; i < d.size; i++ {
-			go d.handle()
-		}
+		d.once.Do(func() {
+			d.group.Add(1)
+			go d.run()
+			for i := 0; i < d.size; i++ {
+				go d.handle()
+			}
+		})
 	}
 }
 
 func (d *AsyncPool) Stop() {
-	if atomic.CompareAndSwapInt32(&d.status, 1, 0) {
-		close(d.exit)
-		d.Wait()
-		atomic.StoreUint64(&d.id, 0)
-		d.Add(d.size)
-		close(d.list)
-		d.Wait()
-	}
+	atomic.CompareAndSwapInt32(&d.status, 1, 0)
+}
+
+func (d *AsyncPool) Done() {
+	atomic.StoreInt32(&d.status, 0)
+	close(d.exit)
+}
+
+func (d *AsyncPool) Wait() {
+	atomic.StoreUint64(&d.id, 0)
+	d.group.Wait()
+	d.group.Add(d.size)
+	close(d.list)
+	d.group.Wait()
 }
 
 func (d *AsyncPool) Push(f func()) {

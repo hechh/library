@@ -6,12 +6,13 @@ import (
 )
 
 type Async struct {
-	sync.WaitGroup
-	id     uint64         // 唯一id
-	status int32          // 状态
+	once   sync.Once
+	group  sync.WaitGroup
 	queue  *Queue[func()] // 任务队列
 	notify chan struct{}  // 通知
 	exit   chan struct{}  // 退出
+	id     uint64         // 唯一id
+	status int32          // 状态
 }
 
 func NewAsync() *Async {
@@ -36,17 +37,25 @@ func (d *Async) SetId(id uint64) {
 
 func (d *Async) Start() {
 	if atomic.CompareAndSwapInt32(&d.status, 0, 1) {
-		d.Add(1)
-		go d.run()
+		d.once.Do(func() {
+			d.group.Add(1)
+			go d.run()
+		})
 	}
 }
 
 func (d *Async) Stop() {
-	if atomic.CompareAndSwapInt32(&d.status, 1, 0) {
-		close(d.exit)
-		d.Wait()
-		atomic.StoreUint64(&d.id, 0)
-	}
+	atomic.CompareAndSwapInt32(&d.status, 1, 0)
+}
+
+func (d *Async) Done() {
+	atomic.StoreInt32(&d.status, 0)
+	close(d.exit)
+}
+
+func (d *Async) Wait() {
+	atomic.StoreUint64(&d.id, 0)
+	d.group.Wait()
 }
 
 func (d *Async) Push(f func()) {
@@ -64,7 +73,7 @@ func (d *Async) run() {
 		for f := d.queue.Pop(); f != nil; f = d.queue.Pop() {
 			Recover(f)
 		}
-		d.Done()
+		d.group.Done()
 	}()
 	for {
 		select {
