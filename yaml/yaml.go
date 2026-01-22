@@ -34,15 +34,6 @@ type NatsConfig struct {
 	Endpoints string `yaml:"endpoints"`
 }
 
-// 游戏配置
-type TableConfig struct {
-	IsRemote  bool     `yaml:"is_remote"`
-	Ext       string   `yaml:"ext"`
-	Path      string   `yaml:"path"`
-	Topic     string   `yaml:"topic"`
-	Endpoints []string `yaml:"endpoints"`
-}
-
 type NodeConfig struct {
 	RouterExpire   int64  `yaml:"router_expire"`
 	RegisterExpire int64  `yaml:"register_expire"`
@@ -50,6 +41,7 @@ type NodeConfig struct {
 	LogPath        string `yaml:"log_path"`
 	Ip             string `yaml:"ip"`
 	Port           int    `yaml:"port"`
+	TablePath      string `yaml:"table_path"`
 }
 
 func Load(filename string, cfg any) error {
