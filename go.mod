@@ -3,6 +3,7 @@ module github.com/hechh/library
 go 1.24.1
 
 require (
+	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/go-xorm/xorm v0.7.9
@@ -21,6 +22,7 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	xorm.io/builder v0.3.13 // indirect
 	xorm.io/core v0.7.3 // indirect
