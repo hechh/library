@@ -47,6 +47,8 @@ type CommonConfig struct {
 	IsOpenPprof bool   `yaml:"is_open_pprof"`
 	Mode        string `yaml:"mode"`
 	TablePath   string `yaml:"table_path"`
+	TokenKey    string `yaml:"token_key"`
+	AesKey      string `yaml:"aes_key"`
 }
 
 func Load(filename string, cfg any) error {
