@@ -18,8 +18,7 @@ func NewStdWriter() *StdWriter {
 
 func (d *StdWriter) Push(data IData) {
 	defer put(data)
-	tt := data.Now()
-	fmt.Fprint(os.Stdout, tt.Format("2006-01-02 15:04:05")+"\t"+string(data.Read()))
+	fmt.Fprint(os.Stdout, string(data.Read()))
 }
 
 func (d *StdWriter) Close() {}
