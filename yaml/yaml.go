@@ -41,7 +41,12 @@ type NodeConfig struct {
 	LogPath        string `yaml:"log_path"`
 	Ip             string `yaml:"ip"`
 	Port           int    `yaml:"port"`
-	TablePath      string `yaml:"table_path"`
+}
+
+type CommonConfig struct {
+	IsOpenPprof bool   `yaml:"is_open_pprof"`
+	Mode        string `yaml:"mode"`
+	TablePath   string `yaml:"table_path"`
 }
 
 func Load(filename string, cfg any) error {
