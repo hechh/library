@@ -2,9 +2,7 @@ package mlog
 
 import (
 	"fmt"
-	"path"
 	"runtime"
-	"strings"
 	"sync/atomic"
 
 	"github.com/spf13/cast"
@@ -77,15 +75,18 @@ func (d *Logger) Fatal(skip int, format string, args ...any) {
 
 func (d *Logger) output(depth int, level int32, msg string) {
 	meta := Meta{Level: level, Msg: msg}
-	if depth > 0 {
-		pc, file, line, _ := runtime.Caller(depth + 1)
-		fname := path.Base(runtime.FuncForPC(pc).Name())
-		if pos := strings.Index(fname, ".("); pos >= 0 {
-			fname = fname[pos+1:]
-		}
+	if depth >= 2 {
+		_, file, line, _ := runtime.Caller(depth + 1)
+		//pc, file, line, _ := runtime.Caller(depth + 1)
+		/*
+			fname := path.Base(runtime.FuncForPC(pc).Name())
+			if pos := strings.Index(fname, ".("); pos >= 0 {
+				fname = fname[pos+1:]
+			}
+		*/
 		meta.FileName = file
 		meta.Line = line
-		meta.FuncName = fname
+		//meta.FuncName = fname
 	}
 	data := get(len(d.list))
 	data.Write(meta)

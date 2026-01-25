@@ -23,9 +23,9 @@ var (
 type Meta struct {
 	FileName string
 	Line     int
-	FuncName string
 	Level    int32
 	Msg      string
+	//	FuncName string
 }
 
 type IData interface {
