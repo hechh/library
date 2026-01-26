@@ -68,14 +68,16 @@ func (d *AsyncPool) Wait() {
 	d.group.Wait()
 }
 
-func (d *AsyncPool) Push(f func()) {
-	if atomic.CompareAndSwapInt32(&d.status, 1, 1) {
+func (d *AsyncPool) Push(f func()) bool {
+	flag := atomic.CompareAndSwapInt32(&d.status, 1, 1)
+	if flag {
 		d.queue.Push(f)
 		select {
 		case d.notify <- struct{}{}:
 		default:
 		}
 	}
+	return flag
 }
 
 func (d *AsyncPool) handle() {
