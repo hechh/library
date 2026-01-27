@@ -1,60 +1,25 @@
 package xlsx2data
 
 import (
-	"os"
 	"strings"
 
-	"github.com/hechh/library/convertor"
+	"github.com/hechh/library/toolkit"
 	"github.com/hechh/library/uerror"
 	"github.com/hechh/library/util"
 	"github.com/spf13/cast"
 	"github.com/xuri/excelize/v2"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 type MsgParser struct {
-	pkg     string
-	files   *protoregistry.Files
 	data    map[string]*EnumDescriptor
 	enums   []*EnumDescriptor
 	configs []*StructDescriptor
 }
 
-func NewMsgParser(pkg string, filename string) (*MsgParser, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, uerror.Err(-1, " 加载文件(%s)失败: %v", filename, err)
+func NewMsgParser() *MsgParser {
+	return &MsgParser{
+		data: make(map[string]*EnumDescriptor),
 	}
-
-	fds := &descriptorpb.FileDescriptorSet{}
-	if err := proto.Unmarshal(data, fds); err != nil {
-		return nil, err
-	}
-
-	d := &MsgParser{data: make(map[string]*EnumDescriptor)}
-	if files, err := protodesc.NewFiles(fds); err != nil {
-		return nil, err
-	} else {
-		d.pkg = pkg
-		d.files = files
-	}
-	return d, nil
-}
-
-func (d *MsgParser) GetFullName(name string) protoreflect.FullName {
-	return protoreflect.FullName(d.pkg + "." + name)
-}
-
-func (d *MsgParser) GetMessageType(name string) (protoreflect.MessageDescriptor, error) {
-	msgType, err := d.files.FindDescriptorByName(d.GetFullName(name))
-	if err == protoregistry.NotFound {
-		err = nil
-	}
-	return msgType.(protoreflect.MessageDescriptor), err
 }
 
 // @config[:col]|sheet:MessageName
@@ -110,11 +75,11 @@ func (d *MsgParser) ParseFile(filename string) error {
 }
 
 func (d *MsgParser) parseStruct(name string, rows [][]string) error {
-	aryType, err := d.GetMessageType(name + "Ary")
+	aryType, err := toolkit.GetMessageType(name + "Ary")
 	if err != nil {
 		return err
 	}
-	cfgType, err := d.GetMessageType(name)
+	cfgType, err := toolkit.GetMessageType(name)
 	if err != nil {
 		return err
 	}
@@ -140,7 +105,7 @@ func (d *MsgParser) parseEnum(rows [][]string) {
 			enum, ok := d.data[strs[2]]
 			if !ok {
 				enum = NewEnumDescriptor(strs[2])
-				convertor.Register(func(val string) any { return enum.ToInt32(val) }, "int32", strs[2])
+				toolkit.Register(func(val string) any { return enum.ToInt32(val) }, "int32", strs[2])
 				d.enums = append(d.enums, enum)
 				d.data[strs[2]] = enum
 			}

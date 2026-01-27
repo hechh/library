@@ -16,9 +16,11 @@ type MsgParser struct {
 	pkgname string
 	option  string
 	dst     string
+	sts     map[string]*StructDescriptor
 	data    map[string]*EnumDescriptor
 	enums   []*EnumDescriptor
-	configs []*StructDescriptor
+	structs []*StructDescriptor
+	configs []*ConfigDescriptor
 }
 
 func NewMsgParser(p string, o string, dst string) *MsgParser {
@@ -26,6 +28,7 @@ func NewMsgParser(p string, o string, dst string) *MsgParser {
 		pkgname: p,
 		option:  o,
 		dst:     dst,
+		sts:     make(map[string]*StructDescriptor),
 		data:    make(map[string]*EnumDescriptor),
 	}
 }
@@ -58,28 +61,34 @@ func (d *MsgParser) ParseFile(filename string) error {
 				if err != nil {
 					return uerror.Err(-1, "表格(%s)不存在", strs[1])
 				}
-				d.parseStruct(names[1], rows)
+				d.parseConfig(names[1], rows)
 			case "@config:col":
 				names := strings.Split(strs[1], ":")
 				rows, err := fp.GetCols(names[0])
 				if err != nil {
 					return uerror.Err(-1, "表格(%s)不存在", strs[1])
 				}
-				d.parseStruct(names[1], rows)
+				d.parseConfig(names[1], rows)
 			case "@enum":
 				rows, err := fp.GetRows(strs[1])
 				if err != nil {
 					return uerror.Err(-1, "表格(%s)不存在", strs[1])
 				}
 				d.parseEnum(rows)
+			case "@struct":
+				rows, err := fp.GetRows(strs[1])
+				if err != nil {
+					return uerror.Err(-1, "表格(%s)不存在", strs[1])
+				}
+				d.parseStruct(rows)
 			}
 		}
 	}
 	return nil
 }
 
-func (d *MsgParser) parseStruct(name string, rows [][]string) {
-	st := NewStructDescriptor(name)
+func (d *MsgParser) parseConfig(name string, rows [][]string) {
+	st := NewConfigDescriptor(name)
 	for i, item := range rows[1] {
 		if len(item) <= 0 {
 			continue
@@ -87,6 +96,25 @@ func (d *MsgParser) parseStruct(name string, rows [][]string) {
 		st.Put(int32(i)+1, rows[0][i], item, rows[2][i])
 	}
 	d.configs = append(d.configs, st)
+}
+
+// S|CoinReward|CoinType|CoinType|货币类型
+func (d *MsgParser) parseStruct(rows [][]string) {
+	for _, items := range rows {
+		for _, val := range items {
+			if !strings.HasPrefix(val, "S|") && !strings.HasPrefix(val, "s|") {
+				continue
+			}
+			strs := strings.Split(val, "|")
+			st, ok := d.sts[strs[1]]
+			if !ok {
+				st = NewStructDescriptor(strs[1])
+				d.sts[st.name] = st
+				d.structs = append(d.structs, st)
+			}
+			st.Put(int32(len(st.list)+1), strs[2], strs[3], strs[4])
+		}
+	}
 }
 
 // E|游戏类型-德州NORMAL|GameType|Normal|1
@@ -112,10 +140,6 @@ func (d *MsgParser) Gen() error {
 	buf := bytes.NewBuffer(nil)
 
 	pos, _ := buf.WriteString(fmt.Sprintf(`
-/*
-* 本代码由cfgtool工具生成，请勿手动修改
-*/
-
 syntax = "proto3";
 
 package %s;
@@ -136,6 +160,22 @@ option  go_package = "%s";
 		}
 	}
 
+	if len(d.structs) > 0 {
+		sort.Slice(d.structs, func(i, j int) bool {
+			return strings.Compare(d.structs[i].name, d.structs[j].name) <= 0
+		})
+		buf.Truncate(pos)
+		if d.hasEnum() {
+			buf.WriteString("import \"enum.gen.proto\";\n\n")
+		}
+		for _, item := range d.structs {
+			buf.WriteString(item.String())
+		}
+		if err := util.Save(d.dst, "struct.gen.proto", buf.Bytes()); err != nil {
+			return err
+		}
+	}
+
 	if len(d.configs) > 0 {
 		sort.Slice(d.configs, func(i, j int) bool {
 			return strings.Compare(d.configs[i].name, d.configs[j].name) <= 0
@@ -143,6 +183,9 @@ option  go_package = "%s";
 		buf.Truncate(pos)
 		if d.hasEnum() {
 			buf.WriteString("import \"enum.gen.proto\";\n\n")
+		}
+		if d.hasStruct() {
+			buf.WriteString("import \"struct.gen.proto\";\n\n")
 		}
 		for _, item := range d.configs {
 			buf.WriteString(item.String())
@@ -156,6 +199,17 @@ func (d *MsgParser) hasEnum() bool {
 	for _, item := range d.configs {
 		for _, field := range item.list {
 			if _, ok := d.data[field.class]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (d *MsgParser) hasStruct() bool {
+	for _, item := range d.configs {
+		for _, field := range item.list {
+			if _, ok := d.sts[field.class]; ok {
 				return true
 			}
 		}

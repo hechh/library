@@ -12,7 +12,7 @@ import (
 	pb "%s"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"github.com/hechh/library/uerror"
 	"github.com/hechh/library/myredis"
 	"github.com/spf13/cast"

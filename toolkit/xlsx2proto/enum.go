@@ -27,12 +27,12 @@ func NewEnumDescriptor(name string) *EnumDescriptor {
 }
 
 // E|游戏类型-德州NORMAL|GameType|Normal|1
-func (d *EnumDescriptor) Put(val int32, name string, gameType string, Desc string) {
+func (d *EnumDescriptor) Put(val int32, name string, gameType string, desc string) {
 	item := &Value{
 		class: gameType,
 		name:  name,
 		value: val,
-		desc:  Desc,
+		desc:  desc,
 	}
 	d.list = append(d.list, item)
 	d.data[item.desc] = item

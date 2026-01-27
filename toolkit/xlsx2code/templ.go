@@ -15,7 +15,7 @@ import (
 {{if .List}}
 	"github.com/hechh/library/util"
 {{end}}
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"github.com/hechh/library/fwatcher"
 	"google.golang.org/protobuf/encoding/prototext"
 )

@@ -8,7 +8,7 @@ const templ = `
 package {{.GetPkgName}}
 
 import (
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 {{range $st := .GetAllEnum -}}

@@ -3,7 +3,7 @@ package xlsx2data
 import (
 	"strings"
 
-	"github.com/hechh/library/convertor"
+	"github.com/hechh/library/toolkit"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -68,7 +68,7 @@ func (d *StructDescriptor) parse(str string) *Field {
 		item := d.parse(strings.TrimPrefix(str, "*"))
 		return &Field{class: item.class, token: POINTER}
 	}
-	return &Field{class: convertor.Target(str), token: IDENT}
+	return &Field{class: toolkit.Target(str), token: IDENT}
 }
 
 func (d *StructDescriptor) Marshal() ([]byte, error) {
@@ -76,7 +76,10 @@ func (d *StructDescriptor) Marshal() ([]byte, error) {
 	list := ary.Mutable(d.aryType.Fields().ByName("Ary")).List()
 	for _, line := range d.rows {
 		cfg := dynamicpb.NewMessage(d.cfgType)
-		for _, field := range d.list {
+		for pos, field := range d.list {
+			if pos+1 > len(line) {
+				break
+			}
 			switch field.token {
 			case IDENT, POINTER:
 				cfg.Set(field.fieldType, convert(field, line[field.position-1]))
@@ -95,7 +98,7 @@ func (d *StructDescriptor) Marshal() ([]byte, error) {
 }
 
 func convert(field *Field, val string) protoreflect.Value {
-	value := convertor.Convert(field.class, val)
+	value := toolkit.Convert(field.class, val)
 	switch field.fieldType.Kind() {
 	case protoreflect.BoolKind:
 		return protoreflect.ValueOf(value)

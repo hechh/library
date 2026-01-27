@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hechh/library/convertor"
+	"github.com/hechh/library/toolkit"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -88,7 +88,7 @@ func (d *StructDescriptor) parse(str string) *Field {
 		item := d.parse(strings.TrimPrefix(str, "*"))
 		return &Field{Type: item.Type}
 	}
-	return &Field{Type: convertor.Target(str)}
+	return &Field{Type: toolkit.Target(str)}
 }
 
 func (d *Index) GetArg() string {
