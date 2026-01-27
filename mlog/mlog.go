@@ -53,14 +53,14 @@ func put(obj IData) {
 	}
 }
 
-func Init(mode string, level string, lpath string, lname string) {
+func Init(mode int, level string, lpath string, lname string) {
 	logObj.Close()
 	switch mode {
-	case "debug":
+	case 0:
 		logObj = NewLogger(level, &StdWriter{})
-	case "develop":
+	case 1:
 		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
-	case "release":
+	case 2:
 		logObj = NewLogger(level, NewLogWriter(lpath, lname))
 	}
 }
