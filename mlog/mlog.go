@@ -62,6 +62,8 @@ func Init(mode int, level string, lpath string, lname string) {
 		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
 	case 2:
 		logObj = NewLogger(level, NewLogWriter(lpath, lname))
+	default:
+		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
 	}
 }
 

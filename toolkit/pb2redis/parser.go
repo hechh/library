@@ -103,7 +103,7 @@ func (d *Parser) Gen(dst string, pbimport string) error {
 		"GetArgs":   GetArgs,
 	}
 	strTpl := template.Must(template.New("str").Funcs(funcs).Parse(fmt.Sprintf(stringTempl, pbimport)))
-	hashTpl := template.Must(template.New("hash").Funcs(funcs).Parse(hashTempl))
+	hashTpl := template.Must(template.New("hash").Funcs(funcs).Parse(fmt.Sprintf(hashTempl, pbimport)))
 
 	// 生成文件
 	buf := bytes.NewBuffer(nil)
@@ -127,12 +127,16 @@ func (d *Parser) Gen(dst string, pbimport string) error {
 }
 
 func ParseField(str string) (key string, rets []*Field) {
-	pos := strings.Index(str, ":")
-	if pos >= 0 {
-		key = str[:pos]
+	if !strings.Contains(str, "@") {
+		key = str
+		return
 	}
-	for _, val := range strings.Split(str[pos+1:], ",") {
-		pos = strings.Index(val, "@")
+	if pos := strings.Index(str, ":"); pos >= 0 {
+		key = str[:pos]
+		str = str[pos+1:]
+	}
+	for _, val := range strings.Split(str, ",") {
+		pos := strings.Index(val, "@")
 		switch strings.ToLower(val[pos+1:]) {
 		case "string":
 			key += ":%s"
