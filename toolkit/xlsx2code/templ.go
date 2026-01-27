@@ -1,6 +1,6 @@
 package xlsx2code
 
-const Templ = `
+const templ = `
 /*
 * 本代码由cfgtool工具生成，请勿手动修改
 */

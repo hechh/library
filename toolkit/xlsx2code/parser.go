@@ -2,6 +2,7 @@ package xlsx2code
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -36,11 +37,13 @@ func NewMsgParser(pkg string, filename string) (*MsgParser, error) {
 		return nil, err
 	}
 
-	d := &MsgParser{data: make(map[string]*StructDescriptor)}
+	d := &MsgParser{
+		pkg:  pkg,
+		data: make(map[string]*StructDescriptor),
+	}
 	if files, err := protodesc.NewFiles(fds); err != nil {
 		return nil, err
 	} else {
-		d.pkg = pkg
 		d.files = files
 	}
 	return d, nil
@@ -122,7 +125,15 @@ func (d *MsgParser) parseStruct(name string, rows [][]string, rules ...string) e
 	return nil
 }
 
-func (d *MsgParser) Gen(dst string, tpl *template.Template) error {
+func (d *MsgParser) Gen(dst string, pbimport string) error {
+	tpl, err := template.New("templ").Funcs(template.FuncMap{
+		"ToSnake":      strcase.ToSnake,
+		"ToLowerCamel": strcase.ToLowerCamel,
+	}).Parse(fmt.Sprintf(templ, pbimport))
+	if err != nil {
+		return err
+	}
+
 	buf := bytes.NewBuffer(nil)
 	for _, item := range d.list {
 		pkgname := strcase.ToSnake(item.Name)
