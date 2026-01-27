@@ -127,7 +127,7 @@ func HGet({{GetArgs .Keys .Fields}}) (*pb.{{.Name}}, error) {
 	// 解析数据
 	data := &pb.{{.Name}}{}
 	err = proto.Unmarshal([]byte(str), data)
-	return data, nil
+	return data, err 
 }
 
 func HSet({{GetArgs .Keys .Fields}}, data *pb.{{.Name}}) error {
