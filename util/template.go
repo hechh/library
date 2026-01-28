@@ -1,5 +1,7 @@
 package util
 
+import "reflect"
+
 func Or[T any](flag bool, a, b T) T {
 	if flag {
 		return a
@@ -29,4 +31,13 @@ func Suffix[T any](arr []T, pos int) []T {
 		return arr
 	}
 	return arr[pos:]
+}
+
+func Contains[T any](src []T, dst T) bool {
+	for i := range src {
+		if reflect.DeepEqual(src[i], dst) {
+			return true
+		}
+	}
+	return false
 }
