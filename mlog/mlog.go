@@ -57,7 +57,7 @@ func Init(mode int, level string, lpath string, lname string) {
 	logObj.Close()
 	switch mode {
 	case 1: // develop
-		logObj = NewLogger(level, &StdWriter{})
+		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
 	case 2: // beta
 		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
 	case 3: // release
