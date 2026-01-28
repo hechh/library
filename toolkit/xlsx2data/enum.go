@@ -32,8 +32,8 @@ func (d *EnumDescriptor) Put(val int32, name string, gameType string, desc strin
 	d.data[item.desc] = item
 }
 
-func (d *EnumDescriptor) ToInt32(val string) int32 {
-	if val, ok := d.data[val]; ok {
+func (d *EnumDescriptor) ToInt32(desc string) int32 {
+	if val, ok := d.data[desc]; ok {
 		return val.value
 	}
 	return 0

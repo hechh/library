@@ -68,7 +68,7 @@ func (d *StructDescriptor) parse(str string) *Field {
 		item := d.parse(strings.TrimPrefix(str, "*"))
 		return &Field{class: item.class, token: POINTER}
 	}
-	return &Field{class: toolkit.Target(str), token: IDENT}
+	return &Field{class: str, token: IDENT}
 }
 
 func (d *StructDescriptor) Marshal() ([]byte, error) {
