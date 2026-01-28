@@ -56,11 +56,11 @@ func put(obj IData) {
 func Init(mode int, level string, lpath string, lname string) {
 	logObj.Close()
 	switch mode {
-	case 1: // develop
+	case 1: // 调试模式
+		logObj = NewLogger(level, &StdWriter{})
+	case 2: // 开发模式
 		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
-	case 2: // beta
-		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
-	case 3: // release
+	case 3: // 发布模式
 		logObj = NewLogger(level, NewLogWriter(lpath, lname))
 	default:
 		logObj = NewLogger(level, &StdWriter{}, NewLogWriter(lpath, lname))
