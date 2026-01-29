@@ -44,8 +44,8 @@ type NodeConfig struct {
 }
 
 type CommonConfig struct {
-	RunMode     string `yaml:"run_mode"`
-	RunEnv      string `yaml:"run_env"`
+	Env         int32  `yaml:"env"`
+	Mode        int32  `yaml:"mode"`
 	IsOpenPprof bool   `yaml:"is_open_pprof"`
 	TablePath   string `yaml:"table_path"`
 	TokenKey    string `yaml:"token_key"`
