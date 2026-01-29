@@ -1,9 +1,27 @@
 package util
 
-import "reflect"
+import (
+	"reflect"
+
+	"golang.org/x/exp/constraints"
+)
 
 func Or[T any](flag bool, a, b T) T {
 	if flag {
+		return a
+	}
+	return b
+}
+
+func Max[T constraints.Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func Min[T constraints.Ordered](a, b T) T {
+	if a < b {
 		return a
 	}
 	return b

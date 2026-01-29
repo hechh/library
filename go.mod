@@ -12,6 +12,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/spf13/cast v1.10.0
 	github.com/xuri/excelize/v2 v2.10.0
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
