@@ -20,12 +20,24 @@ var (
 	dataPool = sync.Pool{New: func() any { return NewData() }}
 )
 
+func get(times int) IData {
+	obj := dataPool.Get().(IData)
+	obj.Add(int32(times))
+	return obj
+}
+
+func put(obj IData) {
+	if obj.Done() == 0 {
+		dataPool.Put(obj)
+	}
+}
+
 type Meta struct {
 	FileName string
 	Line     int
 	Level    int32
 	Msg      string
-	//	FuncName string
+	//FuncName string
 }
 
 type IData interface {
@@ -39,18 +51,6 @@ type IData interface {
 type IWriter interface {
 	Push(IData) // 推送日志
 	Close()     // 关闭
-}
-
-func get(times int) IData {
-	obj := dataPool.Get().(IData)
-	obj.Add(int32(times))
-	return obj
-}
-
-func put(obj IData) {
-	if obj.Done() == 0 {
-		dataPool.Put(obj)
-	}
 }
 
 func Init(mode int, level string, lpath string, lname string) {
@@ -69,6 +69,10 @@ func Init(mode int, level string, lpath string, lname string) {
 
 func Close() {
 	logObj.Close()
+}
+
+func Filter(names ...string) {
+	logObj.Filter(names...)
 }
 
 func Tracef(format string, args ...any) {

@@ -2,15 +2,18 @@ package mlog
 
 import (
 	"fmt"
+	"path"
 	"runtime"
+	"strings"
 	"sync/atomic"
 
 	"github.com/spf13/cast"
 )
 
 type Logger struct {
-	level int32
-	list  []IWriter
+	level   int32
+	list    []IWriter
+	filters map[string]struct{}
 }
 
 func NewLogger(level any, ws ...IWriter) *Logger {
@@ -22,8 +25,9 @@ func NewLogger(level any, ws ...IWriter) *Logger {
 		logLevel = cast.ToInt32(vv)
 	}
 	return &Logger{
-		level: logLevel,
-		list:  ws,
+		level:   logLevel,
+		list:    ws,
+		filters: make(map[string]struct{}),
 	}
 }
 
@@ -35,6 +39,12 @@ func (d *Logger) Close() {
 
 func (d *Logger) SetLevel(level int32) {
 	atomic.StoreInt32(&d.level, level)
+}
+
+func (d *Logger) Filter(names ...string) {
+	for _, name := range names {
+		d.filters[name] = struct{}{}
+	}
 }
 
 func (d *Logger) Trace(skip int, format string, args ...any) {
@@ -74,16 +84,17 @@ func (d *Logger) Fatal(skip int, format string, args ...any) {
 }
 
 func (d *Logger) output(depth int, level int32, msg string) {
+	_, file, line, _ := runtime.Caller(depth + 1)
+	pc, file, line, _ := runtime.Caller(depth + 1)
+	fname := path.Base(runtime.FuncForPC(pc).Name())
+	if pos := strings.LastIndex(fname, "."); pos >= 0 {
+		fname = fname[pos+1:]
+	}
+	if _, ok := d.filters[fname]; ok {
+		return
+	}
 	meta := Meta{Level: level, Msg: msg}
 	if depth >= 2 {
-		_, file, line, _ := runtime.Caller(depth + 1)
-		//pc, file, line, _ := runtime.Caller(depth + 1)
-		/*
-			fname := path.Base(runtime.FuncForPC(pc).Name())
-			if pos := strings.Index(fname, ".("); pos >= 0 {
-				fname = fname[pos+1:]
-			}
-		*/
 		meta.FileName = file
 		meta.Line = line
 		//meta.FuncName = fname
