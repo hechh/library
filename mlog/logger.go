@@ -84,18 +84,20 @@ func (d *Logger) Fatal(skip int, attr, format string, args ...any) {
 }
 
 func (d *Logger) output(depth int, level int32, attr, msg string) {
-	pc, file, _, _ := runtime.Caller(depth + 1)
-	if len(attr) <= 0 {
-		fname := path.Base(runtime.FuncForPC(pc).Name())
-		if pos := strings.LastIndex(fname, "."); pos >= 0 {
-			attr = fname[pos+1:]
+	if level >= LOG_ERROR {
+		pc, file, _, _ := runtime.Caller(depth + 1)
+		if len(attr) <= 0 {
+			fname := path.Base(runtime.FuncForPC(pc).Name())
+			if pos := strings.LastIndex(fname, "."); pos >= 0 {
+				attr = fname[pos+1:]
+			}
 		}
-	}
-	if _, ok := d.filters[path.Base(file)]; ok {
-		return
-	}
-	if _, ok := d.filters[attr]; ok {
-		return
+		if _, ok := d.filters[path.Base(file)]; ok {
+			return
+		}
+		if _, ok := d.filters[attr]; ok {
+			return
+		}
 	}
 	meta := Meta{Level: level, Msg: msg}
 	/*
