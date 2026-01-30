@@ -2,8 +2,6 @@ package mlog
 
 import (
 	"bytes"
-	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -42,14 +40,16 @@ func (d *Data) Write(data Meta) {
 	d.buffer.WriteString("] [")
 	d.buffer.WriteString(LevelToString(data.Level))
 	d.buffer.WriteString("] ")
-	if len(data.FileName) > 0 {
-		d.buffer.WriteString(filepath.Base(data.FileName))
-		d.buffer.WriteByte(':')
-		d.buffer.WriteString(strconv.Itoa(data.Line))
-		d.buffer.WriteByte(' ')
-		//d.buffer.WriteString(data.FuncName)
-		//d.buffer.WriteByte(' ')
-	}
+	/*
+		if len(data.FileName) > 0 {
+			d.buffer.WriteString(filepath.Base(data.FileName))
+			d.buffer.WriteByte(':')
+			d.buffer.WriteString(strconv.Itoa(data.Line))
+			d.buffer.WriteByte(' ')
+			d.buffer.WriteString(data.FuncName)
+			d.buffer.WriteByte(' ')
+		}
+	*/
 	d.buffer.WriteString(data.Msg)
 	d.buffer.WriteByte('\n')
 }

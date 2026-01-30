@@ -33,10 +33,10 @@ func put(obj IData) {
 }
 
 type Meta struct {
-	FileName string
-	Line     int
-	Level    int32
-	Msg      string
+	//FileName string
+	//Line     int
+	Level int32
+	Msg   string
 	//FuncName string
 }
 

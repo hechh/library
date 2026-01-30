@@ -84,8 +84,8 @@ func (d *Logger) Fatal(skip int, format string, args ...any) {
 }
 
 func (d *Logger) output(depth int, level int32, msg string) {
-	_, file, line, _ := runtime.Caller(depth + 1)
-	pc, file, line, _ := runtime.Caller(depth + 1)
+	//pc, file, line, _ := runtime.Caller(depth + 1)
+	pc, _, _, _ := runtime.Caller(depth + 1)
 	fname := path.Base(runtime.FuncForPC(pc).Name())
 	if pos := strings.LastIndex(fname, "."); pos >= 0 {
 		fname = fname[pos+1:]
@@ -94,11 +94,13 @@ func (d *Logger) output(depth int, level int32, msg string) {
 		return
 	}
 	meta := Meta{Level: level, Msg: msg}
-	if depth >= 2 {
-		meta.FileName = file
-		meta.Line = line
-		//meta.FuncName = fname
-	}
+	/*
+		if depth >= 2 {
+			meta.FileName = file
+			meta.Line = line
+			meta.FuncName = fname
+		}
+	*/
 	data := get(len(d.list))
 	data.Write(meta)
 	for _, w := range d.list {
