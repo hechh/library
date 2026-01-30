@@ -84,7 +84,7 @@ func (d *Logger) Fatal(skip int, attr, format string, args ...any) {
 }
 
 func (d *Logger) output(depth int, level int32, attr, msg string) {
-	if level >= LOG_ERROR {
+	if level < LOG_ERROR {
 		pc, file, _, _ := runtime.Caller(depth + 1)
 		if len(attr) <= 0 {
 			fname := path.Base(runtime.FuncForPC(pc).Name())
@@ -100,13 +100,6 @@ func (d *Logger) output(depth int, level int32, attr, msg string) {
 		}
 	}
 	meta := Meta{Level: level, Msg: msg}
-	/*
-		if depth >= 2 {
-			meta.FileName = file
-			meta.Line = line
-			meta.FuncName = fname
-		}
-	*/
 	data := get(len(d.list))
 	data.Write(meta)
 	for _, w := range d.list {
