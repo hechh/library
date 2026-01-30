@@ -47,52 +47,54 @@ func (d *Logger) Filter(names ...string) {
 	}
 }
 
-func (d *Logger) Trace(skip int, format string, args ...any) {
+func (d *Logger) Trace(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_TRACE {
-		d.output(skip+1, LOG_TRACE, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_TRACE, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) Debug(skip int, format string, args ...any) {
+func (d *Logger) Debug(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_DEBUG {
-		d.output(skip+1, LOG_DEBUG, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_DEBUG, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) Warn(skip int, format string, args ...any) {
+func (d *Logger) Warn(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_WARN {
-		d.output(skip+1, LOG_WARN, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_WARN, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) Info(skip int, format string, args ...any) {
+func (d *Logger) Info(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_INFO {
-		d.output(skip+1, LOG_INFO, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_INFO, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) Error(skip int, format string, args ...any) {
+func (d *Logger) Error(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_ERROR {
-		d.output(skip+1, LOG_ERROR, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_ERROR, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) Fatal(skip int, format string, args ...any) {
+func (d *Logger) Fatal(skip int, attr, format string, args ...any) {
 	if atomic.LoadInt32(&d.level) <= LOG_FATAL {
-		d.output(skip+1, LOG_FATAL, fmt.Sprintf(format, args...))
+		d.output(skip+1, LOG_FATAL, attr, fmt.Sprintf(format, args...))
 	}
 }
 
-func (d *Logger) output(depth int, level int32, msg string) {
+func (d *Logger) output(depth int, level int32, attr, msg string) {
 	pc, file, _, _ := runtime.Caller(depth + 1)
-	fname := path.Base(runtime.FuncForPC(pc).Name())
-	if pos := strings.LastIndex(fname, "."); pos >= 0 {
-		fname = fname[pos+1:]
+	if len(attr) <= 0 {
+		fname := path.Base(runtime.FuncForPC(pc).Name())
+		if pos := strings.LastIndex(fname, "."); pos >= 0 {
+			attr = fname[pos+1:]
+		}
 	}
 	if _, ok := d.filters[path.Base(file)]; ok {
 		return
 	}
-	if _, ok := d.filters[fname]; ok {
+	if _, ok := d.filters[attr]; ok {
 		return
 	}
 	meta := Meta{Level: level, Msg: msg}
