@@ -84,11 +84,13 @@ func (d *Logger) Fatal(skip int, format string, args ...any) {
 }
 
 func (d *Logger) output(depth int, level int32, msg string) {
-	//pc, file, line, _ := runtime.Caller(depth + 1)
-	pc, _, _, _ := runtime.Caller(depth + 1)
+	pc, file, _, _ := runtime.Caller(depth + 1)
 	fname := path.Base(runtime.FuncForPC(pc).Name())
 	if pos := strings.LastIndex(fname, "."); pos >= 0 {
 		fname = fname[pos+1:]
+	}
+	if _, ok := d.filters[path.Base(file)]; ok {
+		return
 	}
 	if _, ok := d.filters[fname]; ok {
 		return
