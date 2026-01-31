@@ -61,7 +61,7 @@ func (d *LogWriter) Close() {
 }
 
 func (d *LogWriter) run() {
-	tt := time.NewTicker(3 * time.Second)
+	tt := time.NewTicker(2 * time.Second)
 	defer func() {
 		tt.Stop()
 		for mm := d.datas.Pop(); mm != nil; mm = d.datas.Pop() {
