@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/hechh/library/uerror"
 	"github.com/hechh/library/util"
@@ -13,23 +14,17 @@ import (
 )
 
 type MsgParser struct {
-	pkgname string
-	option  string
-	dst     string
 	sts     map[string]*StructDescriptor
 	data    map[string]*EnumDescriptor
 	enums   []*EnumDescriptor
 	structs []*StructDescriptor
-	configs []*ConfigDescriptor
+	configs []*StructDescriptor
 }
 
-func NewMsgParser(p string, o string, dst string) *MsgParser {
+func NewMsgParser() *MsgParser {
 	return &MsgParser{
-		pkgname: p,
-		option:  o,
-		dst:     dst,
-		sts:     make(map[string]*StructDescriptor),
-		data:    make(map[string]*EnumDescriptor),
+		sts:  make(map[string]*StructDescriptor),
+		data: make(map[string]*EnumDescriptor),
 	}
 }
 
@@ -88,7 +83,7 @@ func (d *MsgParser) ParseFile(filename string) error {
 }
 
 func (d *MsgParser) parseConfig(name string, rows [][]string) {
-	st := NewConfigDescriptor(name)
+	st := NewStructDescriptor(name)
 	for i, item := range rows[1] {
 		if len(item) <= 0 {
 			continue
@@ -109,10 +104,10 @@ func (d *MsgParser) parseStruct(rows [][]string) {
 			st, ok := d.sts[strs[1]]
 			if !ok {
 				st = NewStructDescriptor(strs[1])
-				d.sts[st.name] = st
+				d.sts[st.Name] = st
 				d.structs = append(d.structs, st)
 			}
-			st.Put(int32(len(st.list)+1), strs[2], strs[3], strs[4])
+			st.Put(int32(len(st.List)+1), strs[2], strs[3], strs[4])
 		}
 	}
 }
@@ -136,83 +131,94 @@ func (d *MsgParser) parseEnum(rows [][]string) {
 	}
 }
 
-func (d *MsgParser) Gen() error {
+func (d *MsgParser) get() (rets []string) {
+	flagEnum, flagStruct := 0, 0
+	for _, item := range d.configs {
+		for _, field := range item.List {
+			if _, ok := d.data[field.Class]; ok && flagEnum == 0 {
+				rets = append(rets, "enum.gen.proto")
+				flagEnum++
+			}
+			if _, ok := d.sts[field.Class]; ok && flagStruct == 0 {
+				rets = append(rets, "struct.gen.proto")
+				flagStruct++
+			}
+			if flagEnum > 0 && flagStruct > 0 {
+				return
+			}
+		}
+	}
+	return
+}
+
+func (d *MsgParser) Gen(pkgname, option, dst string) error {
 	buf := bytes.NewBuffer(nil)
-
-	pos, _ := buf.WriteString(fmt.Sprintf(`
-syntax = "proto3";
-
-package %s;
-
-option  go_package = "%s";
-	
-`, d.pkgname, d.option))
-
+	pos, _ := buf.WriteString(fmt.Sprintf(headTempl, pkgname, option))
+	// 枚举
 	if len(d.enums) > 0 {
-		sort.Slice(d.enums, func(i, j int) bool {
-			return strings.Compare(d.enums[i].name, d.enums[j].name) <= 0
-		})
 		for _, item := range d.enums {
-			buf.WriteString(item.String())
+			item.Sort()
 		}
-		if err := util.Save(d.dst, "enum.gen.proto", buf.Bytes()); err != nil {
+		sort.Slice(d.enums, func(i, j int) bool {
+			return strings.Compare(d.enums[i].Name, d.enums[j].Name) <= 0
+		})
+		enumTpl, err := template.New("enum").Parse(enumTempl)
+		if err != nil {
+			return err
+		}
+		if err := enumTpl.Execute(buf, d.enums); err != nil {
+			return err
+		}
+		if err := util.Save(dst, "enum.gen.proto", buf.Bytes()); err != nil {
 			return err
 		}
 	}
-
+	// 结构
 	if len(d.structs) > 0 {
+		for _, item := range d.structs {
+			item.Sort()
+		}
 		sort.Slice(d.structs, func(i, j int) bool {
-			return strings.Compare(d.structs[i].name, d.structs[j].name) <= 0
+			return strings.Compare(d.structs[i].Name, d.structs[j].Name) <= 0
 		})
 		buf.Truncate(pos)
-		if d.hasEnum() {
-			buf.WriteString("import \"enum.gen.proto\";\n\n")
+		structTpl, err := template.New("struct").Parse(structTempl)
+		if err != nil {
+			return err
 		}
-		for _, item := range d.structs {
-			buf.WriteString(item.String())
+		if err := structTpl.Execute(buf, d.structs); err != nil {
+			return err
 		}
-		if err := util.Save(d.dst, "struct.gen.proto", buf.Bytes()); err != nil {
+		if err := util.Save(dst, "struct.gen.proto", buf.Bytes()); err != nil {
 			return err
 		}
 	}
-
+	// 配置
 	if len(d.configs) > 0 {
+		for _, item := range d.configs {
+			item.Sort()
+		}
 		sort.Slice(d.configs, func(i, j int) bool {
-			return strings.Compare(d.configs[i].name, d.configs[j].name) <= 0
+			return strings.Compare(d.configs[i].Name, d.configs[j].Name) <= 0
 		})
 		buf.Truncate(pos)
-		if d.hasEnum() {
-			buf.WriteString("import \"enum.gen.proto\";\n\n")
+		importTpl, err := template.New("import").Parse(importTempl)
+		if err != nil {
+			return err
 		}
-		if d.hasStruct() {
-			buf.WriteString("import \"struct.gen.proto\";\n\n")
+		if err := importTpl.Execute(buf, d.get()); err != nil {
+			return err
 		}
-		for _, item := range d.configs {
-			buf.WriteString(item.String())
+		configTpl, err := template.New("config").Parse(configTempl)
+		if err != nil {
+			return err
 		}
-		return util.Save(d.dst, "table.gen.proto", buf.Bytes())
+		if err := configTpl.Execute(buf, d.configs); err != nil {
+			return err
+		}
+		if err := util.Save(dst, "table.gen.proto", buf.Bytes()); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-func (d *MsgParser) hasEnum() bool {
-	for _, item := range d.configs {
-		for _, field := range item.list {
-			if _, ok := d.data[field.class]; ok {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (d *MsgParser) hasStruct() bool {
-	for _, item := range d.configs {
-		for _, field := range item.list {
-			if _, ok := d.sts[field.class]; ok {
-				return true
-			}
-		}
-	}
-	return false
 }
