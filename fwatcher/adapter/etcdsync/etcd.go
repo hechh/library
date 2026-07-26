@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/hechh/library/base/safe"
-	"github.com/hechh/library/fwatcher/domain"
+	"github.com/hechh/library/fwatcher"
 	"github.com/hechh/library/mlog"
-
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -27,7 +26,7 @@ func NewEtcdSync() *EtcdSync {
 	}
 }
 
-func (d *EtcdSync) Init(cfg *domain.Config) error {
+func (d *EtcdSync) Init(cfg *fwatcher.Config) error {
 	d.prefix = cfg.Etcd.PrefixTopic
 	var err error
 	return safe.Retry(3, 3*time.Second, func() error {

@@ -4,23 +4,44 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hechh/library/fwatcher/domain"
 	"github.com/hechh/library/fwatcher/internal/registry"
 	"github.com/hechh/library/fwatcher/internal/watcher"
 	"github.com/hechh/library/mlog"
 )
 
+type EtcdConfig struct {
+	PrefixTopic string   `yaml:"prefix_topic,omitempty"` // etcd 前缀主题
+	Endpoints   []string `yaml:"endpoints,omitempty"`    // etcd 节点地址列表
+	KeepAlive   int64    `yaml:"keep_alive,omitempty"`   // 保活时间（秒）
+}
+
+type Config struct {
+	DataPath string      `yaml:"data_path,omitempty"` // 数据文件目录
+	XlsxPath string      `yaml:"xlsx_path,omitempty"` // Excel 文件目录
+	Ext      string      `yaml:"ext,omitempty"`       // 文件扩展名
+	Etcd     *EtcdConfig `yaml:"etcd,omitempty"`      // etcd 配置
+}
+
+// 配置同步接口
+type ISync interface {
+	Init(*Config) error
+	Close()
+	Put(string, []byte) error
+	Update(string, []byte) error
+	Delete(string) error
+	Watch(func(string, []byte)) error
+}
+
 // Fwatcher 文件监听器
 type Fwatcher struct {
 	local   *watcher.Watcher // 本地监听
-	sync    domain.ISync     // 远程同步
-	newFunc func() domain.ISync
+	sync    ISync            // 远程同步
+	newFunc func() ISync
 }
 
-func NewFwatcher[T domain.ISync](f func() T) *Fwatcher {
+func NewFwatcher[T ISync](f func() T) *Fwatcher {
 	return &Fwatcher{
-		local: watcher.NewWatcher(),
-		newFunc: func() domain.ISync {
+		newFunc: func() ISync {
 			if f != nil {
 				return f()
 			}
@@ -29,9 +50,10 @@ func NewFwatcher[T domain.ISync](f func() T) *Fwatcher {
 	}
 }
 
-func (d *Fwatcher) Init(cfg *domain.Config) error {
+func (d *Fwatcher) Init(cfg *Config) error {
 	// 初始化watcher
-	if err := d.local.Init(cfg); err != nil {
+	d.local = watcher.NewWatcher(cfg.DataPath, cfg.XlsxPath, cfg.Ext)
+	if err := d.local.Init(); err != nil {
 		return err
 	}
 

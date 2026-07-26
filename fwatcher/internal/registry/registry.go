@@ -8,14 +8,13 @@ import (
 	"strings"
 
 	"github.com/hechh/library/base/fileutil"
-	"github.com/hechh/library/fwatcher/domain"
 	"github.com/hechh/library/fwatcher/internal/parser"
 	"github.com/hechh/library/mlog"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
 var (
-	parsers = make(map[string]domain.IParser)
+	parsers = make(map[string]parser.IParser)
 )
 
 // Register 注册配置解析函数

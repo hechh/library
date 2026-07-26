@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hechh/library/fwatcher"
 	"github.com/hechh/library/fwatcher/adapter/etcdsync"
-	"github.com/hechh/library/fwatcher/domain"
-
 	"go.etcd.io/etcd/server/v3/embed"
 )
 
@@ -28,7 +27,7 @@ func NewMonitor() *EmbedSync {
 }
 
 // Init 启动嵌入式 etcd 服务并委托 Configure.Init 完成客户端初始化。
-func (m *EmbedSync) Init(cfg *domain.Config) error {
+func (m *EmbedSync) Init(cfg *fwatcher.Config) error {
 	dir, err := os.MkdirTemp("", "mock-etcd-configure-")
 	if err != nil {
 		return fmt.Errorf("mock configure: create temp dir: %w", err)

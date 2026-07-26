@@ -8,25 +8,29 @@ import (
 	"github.com/hechh/library/base/fileutil"
 	"github.com/hechh/library/base/logic"
 	"github.com/hechh/library/base/safe"
-	"github.com/hechh/library/fwatcher/domain"
 	"github.com/hechh/library/fwatcher/internal/registry"
 	"github.com/hechh/library/mlog"
 )
 
 type Watcher struct {
-	cfg       domain.Config
+	dataPath  string
+	xlsxPath  string
+	ext       string
 	pattern   string
 	fswatcher *fsnotify.Watcher
 	exitCh    chan struct{}
 }
 
-func NewWatcher() *Watcher {
+func NewWatcher(dataPath, xlsxPath string, ext string) *Watcher {
 	return &Watcher{
-		exitCh: make(chan struct{}),
+		dataPath: dataPath,
+		xlsxPath: xlsxPath,
+		ext:      ext,
+		exitCh:   make(chan struct{}),
 	}
 }
 
-func (d *Watcher) Init(cfg *domain.Config) error {
+func (d *Watcher) Init() error {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -34,7 +38,7 @@ func (d *Watcher) Init(cfg *domain.Config) error {
 	d.fswatcher = w
 
 	// 创建目录
-	abspath, err := filepath.Abs(cfg.DataPath)
+	abspath, err := filepath.Abs(d.dataPath)
 	if err != nil {
 		return fmt.Errorf("resolve path: %w", err)
 	}
@@ -48,7 +52,7 @@ func (d *Watcher) Init(cfg *domain.Config) error {
 	}
 
 	// 初始化加载
-	d.pattern = fmt.Sprintf("%s/*.%s", abspath, cfg.Ext)
+	d.pattern = fmt.Sprintf("%s/*%s", abspath, d.ext)
 	files, err := registry.Glob(d.pattern)
 	if err != nil {
 		return err
@@ -79,7 +83,7 @@ func (d *Watcher) watch() {
 			if logic.Has(event.Op, fsnotify.Write) || logic.Has(event.Op, fsnotify.Create) {
 				files, err := registry.Glob(d.pattern)
 				if err != nil {
-					mlog.Errorf("搜索所有*.%s 文件失败 error=%v", d.cfg.Ext, err)
+					mlog.Errorf("搜索所有*.%s 文件失败 error=%v", d.ext, err)
 					continue
 				}
 

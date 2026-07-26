@@ -6,10 +6,18 @@ import (
 	"sync/atomic"
 
 	"github.com/hechh/library/mlog"
-
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
+
+// 配置解析接口
+type IParser interface {
+	RegisterChange(...func())
+	Sheet() string
+	New([]byte) (proto.Message, error)
+	GetValue() string
+	Parse(hash.Hash, []byte) error
+}
 
 // Parser 配置解析器
 type Parser[T any] struct {

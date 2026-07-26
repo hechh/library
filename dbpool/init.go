@@ -1,7 +1,6 @@
 package dbpool
 
 import (
-	"github.com/hechh/library/dbpool/domain"
 	"github.com/hechh/library/dbpool/internal/registry"
 )
 
@@ -21,21 +20,21 @@ func RegisterShards(datas ...any) {
 	registry.RegisterShards(datas...)
 }
 
-func GetByName(name string) domain.IClient {
+func GetByName(name string) IClient {
 	if object != nil {
 		return object.GetByName(name)
 	}
 	return nil
 }
 
-func GetById(id uint32) domain.IClient {
+func GetById(id uint32) IClient {
 	if object != nil {
 		return object.GetById(id)
 	}
 	return nil
 }
 
-func GetByUid(uid uint64) domain.IClient {
+func GetByUid(uid uint64) IClient {
 	if object != nil {
 		return object.GetByUid(uid)
 	}

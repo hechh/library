@@ -5,11 +5,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hechh/library/base/safe"
-	"github.com/hechh/library/dbpool/domain"
-	"github.com/hechh/library/dbpool/internal/base"
-
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/hechh/library/base/safe"
+	"github.com/hechh/library/dbpool"
+	"github.com/hechh/library/dbpool/internal/base"
 	"xorm.io/xorm"
 )
 
@@ -26,7 +25,7 @@ func NewClient() *Client {
 	return &Client{}
 }
 
-func (d *Client) Init(cfg *domain.DbConfig, tables ...any) error {
+func (d *Client) Init(cfg *dbpool.DbConfig, tables ...any) error {
 	d.dsn = append(d.dsn,
 		fmt.Sprintf(
 			"%s:%s@tcp(%s:%d)/%s?timeout=3s&readTimeout=10s&writeTimeout=10s&parseTime=true&charset=utf8mb4&loc=Local&tls=false",

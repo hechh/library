@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/hechh/library/base/safe"
-	"github.com/hechh/library/dbpool/domain"
+	"github.com/hechh/library/dbpool"
 	"github.com/hechh/library/dbpool/internal/base"
 	_ "github.com/lib/pq"
 	"xorm.io/xorm"
@@ -25,7 +25,7 @@ func NewClient() *Client {
 	return &Client{}
 }
 
-func (d *Client) Init(cfg *domain.DbConfig, tables ...any) error {
+func (d *Client) Init(cfg *dbpool.DbConfig, tables ...any) error {
 	d.dsn = append(d.dsn,
 		fmt.Sprintf(
 			"postgresql://%s:%s@%s:%d/%s?sslmode=disable",
