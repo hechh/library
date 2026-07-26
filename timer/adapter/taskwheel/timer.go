@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/ankur-anand/taskwheel"
-	"github.com/hechh/library/timer/domain"
+	"github.com/hechh/library/timer"
 )
 
 type taskItem struct {
-	task domain.ITask
+	task timer.ITask
 	id   uint64
 }
 
@@ -25,7 +25,7 @@ func NewTimer() *Timer {
 	return &Timer{}
 }
 
-func (d *Timer) Init(cfg *domain.Config) error {
+func (d *Timer) Init(cfg *timer.Config) error {
 	// 配置分层时间轮，与 lockfree_timer 的能力范围相近
 	// Level 0: 1ms 间隔 × 100 槽 = 100ms 跨度
 	// Level 1: 10ms 间隔 × 100 槽 = 10s 跨度
@@ -70,7 +70,7 @@ func (d *Timer) Close() {
 	}
 }
 
-func (d *Timer) Register(task domain.ITask) error {
+func (d *Timer) Register(task timer.ITask) error {
 	id := atomic.AddUint64(&globalSeq, 1)
 	item := &taskItem{
 		task: task,

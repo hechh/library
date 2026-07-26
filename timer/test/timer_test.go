@@ -7,11 +7,10 @@ import (
 
 	"github.com/hechh/library/timer"
 	"github.com/hechh/library/timer/adapter/lockfree_timer"
-	"github.com/hechh/library/timer/domain"
 )
 
 func Test_Timer_Register(t *testing.T) {
-	cfg := &domain.Config{
+	cfg := &timer.Config{
 		Size:               6,
 		MinPeriodBitNumber: 6,
 	}

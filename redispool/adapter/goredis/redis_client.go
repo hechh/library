@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/hechh/library/redispool/domain"
+	"github.com/hechh/library/redispool"
 )
 
 // Client Redis客户端封装，组合go-redis.Client并添加key前缀支持
@@ -23,7 +23,7 @@ func handleRedisError(err error) error {
 	return fmt.Errorf("redis error: %w", err)
 }
 
-func (d *Client) Init(cfg *domain.DbConfig) error {
+func (d *Client) Init(cfg *redispool.DbConfig) error {
 	cli := redis.NewClient(&redis.Options{
 		IdleTimeout:        1 * time.Minute,
 		MinIdleConns:       100,

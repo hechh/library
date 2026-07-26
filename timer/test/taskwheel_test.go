@@ -7,7 +7,6 @@ import (
 
 	"github.com/hechh/library/timer"
 	"github.com/hechh/library/timer/adapter/taskwheel"
-	"github.com/hechh/library/timer/domain"
 )
 
 // Test_TaskWheel_Register 使用 taskwheel 库的定时器注册测试
@@ -20,7 +19,7 @@ import (
 // taskwheel 在此场景下触发数略高，主要得益于其 1ms 粒度 tick（vs lockfree 的 32ms），
 // 使得时间精度更高、任务到期时更少错过 tick 窗口。
 func Test_TaskWheel_Register(t *testing.T) {
-	cfg := &domain.Config{
+	cfg := &timer.Config{
 		Size:               4,
 		MinPeriodBitNumber: 0,
 	}

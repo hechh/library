@@ -3,8 +3,8 @@ package miniredis
 import (
 	"strconv"
 
+	"github.com/hechh/library/redispool"
 	"github.com/hechh/library/redispool/adapter/goredis"
-	"github.com/hechh/library/redispool/domain"
 
 	"github.com/alicebob/miniredis/v2"
 )
@@ -14,7 +14,7 @@ type Client struct {
 	miniredis *miniredis.Miniredis
 }
 
-func (m *Client) Init(cfg *domain.DbConfig) error {
+func (m *Client) Init(cfg *redispool.DbConfig) error {
 	m.Client = &goredis.Client{}
 	s, err := miniredis.Run()
 	if err != nil {
@@ -23,7 +23,7 @@ func (m *Client) Init(cfg *domain.DbConfig) error {
 	m.miniredis = s
 
 	port, _ := strconv.Atoi(s.Port())
-	return m.Client.Init(&domain.DbConfig{
+	return m.Client.Init(&redispool.DbConfig{
 		Ip:     s.Host(),
 		Port:   uint32(port),
 		Db:     0,

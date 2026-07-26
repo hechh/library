@@ -2,8 +2,6 @@ package timer
 
 import (
 	"fmt"
-
-	"github.com/hechh/library/timer/domain"
 )
 
 var (
@@ -15,7 +13,7 @@ func SetObject(oj *Timer) {
 }
 
 // 注册定时任务
-func Register(task domain.ITask) error {
+func Register(task ITask) error {
 	if object != nil {
 		return object.Register(task)
 	}

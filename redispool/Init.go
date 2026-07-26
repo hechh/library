@@ -1,7 +1,5 @@
 package redispool
 
-import "github.com/hechh/library/redispool/domain"
-
 var object *RedisPool
 
 func SetObject(oj *RedisPool) {
@@ -9,7 +7,7 @@ func SetObject(oj *RedisPool) {
 }
 
 // GetByName 根据名称获取Redis客户端
-func GetByName(name string) domain.IClient {
+func GetByName(name string) IClient {
 	if object != nil {
 		return object.GetByName(name)
 	}
@@ -17,7 +15,7 @@ func GetByName(name string) domain.IClient {
 }
 
 // GetById 根据shardID获取Redis客户端
-func GetById(shardID uint32) domain.IClient {
+func GetById(shardID uint32) IClient {
 	if object != nil {
 		return object.GetById(shardID)
 	}
@@ -25,7 +23,7 @@ func GetById(shardID uint32) domain.IClient {
 }
 
 // GetByUid 根据用户获取Redis客户端
-func GetByUid(uid uint64) domain.IClient {
+func GetByUid(uid uint64) IClient {
 	if object != nil {
 		return object.GetByUid(uid)
 	}

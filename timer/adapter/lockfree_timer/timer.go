@@ -7,18 +7,18 @@ import (
 
 	"github.com/hechh/library/base/safe"
 	"github.com/hechh/library/mlog"
-	"github.com/hechh/library/timer/domain"
+	"github.com/hechh/library/timer"
 )
 
 type Timer struct {
-	wheelSize int               // 轮子数量
-	wheels    []*Wheel          // 轮子数组
-	period    int64             // 最小周期，单位毫秒,必须是2的N次方倍
-	offset    int64             // 偏移量
-	startTime int64             // 定时器启动时间
-	exitCh    chan struct{}     // 退出通道
-	taskCh    chan domain.ITask // 任务通道
-	wg        sync.WaitGroup    // 等待 handler goroutine 退出
+	wheelSize int              // 轮子数量
+	wheels    []*Wheel         // 轮子数组
+	period    int64            // 最小周期，单位毫秒,必须是2的N次方倍
+	offset    int64            // 偏移量
+	startTime int64            // 定时器启动时间
+	exitCh    chan struct{}    // 退出通道
+	taskCh    chan timer.ITask // 任务通道
+	wg        sync.WaitGroup   // 等待 handler goroutine 退出
 }
 
 func NewTimer() *Timer {
@@ -26,7 +26,7 @@ func NewTimer() *Timer {
 }
 
 // 添加定时任务
-func (d *Timer) Register(task domain.ITask) error {
+func (d *Timer) Register(task timer.ITask) error {
 	if task.GetTTL()>>d.offset <= 0 {
 		return fmt.Errorf("不能小于最小定时时间限制")
 	}
@@ -42,13 +42,13 @@ func (d *Timer) Register(task domain.ITask) error {
 	return fmt.Errorf("不能超出最大定时时间限制")
 }
 
-func (d *Timer) Init(cfg *domain.Config) error {
+func (d *Timer) Init(cfg *timer.Config) error {
 	d.wheelSize = cfg.Size
 	d.wheels = make([]*Wheel, cfg.Size)
 	d.period = 1 << cfg.MinPeriodBitNumber
 	d.offset = cfg.MinPeriodBitNumber
 	d.exitCh = make(chan struct{})
-	d.taskCh = make(chan domain.ITask, 100)
+	d.taskCh = make(chan timer.ITask, 100)
 	offset := d.offset
 	for i := 0; i < cfg.Size; i++ {
 		if i == 0 {

@@ -1,26 +1,22 @@
 package redispool
 
-import (
-	"github.com/hechh/library/redispool/domain"
-)
-
 type RedisPool struct {
-	uidModValue uint64                    // 开始 Uid 值，用于路由
-	shardsSize  uint64                    // 分片数量
-	newFunc     func() domain.IClient     // new函数
-	globals     map[string]domain.IClient // 全局数据库连接池
-	shards      map[uint32]domain.IClient // 分片数据库连接池
+	uidModValue uint64             // 开始 Uid 值，用于路由
+	shardsSize  uint64             // 分片数量
+	newFunc     func() IClient     // new函数
+	globals     map[string]IClient // 全局数据库连接池
+	shards      map[uint32]IClient // 分片数据库连接池
 }
 
 func NewRedisPool[T any](f func() *T) *RedisPool {
 	return &RedisPool{
-		newFunc: func() domain.IClient { return any(f()).(domain.IClient) },
-		globals: make(map[string]domain.IClient),
-		shards:  make(map[uint32]domain.IClient),
+		newFunc: func() IClient { return any(f()).(IClient) },
+		globals: make(map[string]IClient),
+		shards:  make(map[uint32]IClient),
 	}
 }
 
-func (d *RedisPool) Init(cfg *domain.Config) error {
+func (d *RedisPool) Init(cfg *Config) error {
 	// 初始化全局数据库
 	for _, dbCfg := range cfg.Globals {
 		cli := d.newFunc()
@@ -55,15 +51,15 @@ func (d *RedisPool) Close() {
 	}
 }
 
-func (d *RedisPool) GetByName(name string) domain.IClient {
+func (d *RedisPool) GetByName(name string) IClient {
 	return d.globals[name]
 }
 
-func (d *RedisPool) GetById(id uint32) domain.IClient {
+func (d *RedisPool) GetById(id uint32) IClient {
 	return d.shards[id]
 }
 
-func (d *RedisPool) GetByUid(uid uint64) domain.IClient {
+func (d *RedisPool) GetByUid(uid uint64) IClient {
 	return d.shards[d.GetShardsId(uid)]
 }
 
