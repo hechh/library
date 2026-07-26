@@ -1,7 +1,6 @@
 package mlog
 
 import (
-	"framework/packet"
 	"strings"
 	"sync/atomic"
 )
@@ -18,17 +17,11 @@ const (
 )
 
 var (
-	object  atomic.Pointer[Logger]
-	filters = make(map[string]struct{})
-	tagFunc func(*packet.Head) string
+	object atomic.Pointer[Logger]
 )
 
 func init() {
 	object.Store(NewLogger())
-}
-
-func SetTagFunc(f func(*packet.Head) string) {
-	tagFunc = f
 }
 
 func Level2Name(level int32) string {
@@ -108,88 +101,88 @@ func EnableCaller() {
 
 func Tracef(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_TRACE, nil, format, args...)
+		obj.Outputf(2, LOG_TRACE, format, args...)
 	}
 }
 
 func Debugf(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_DEBUG, nil, format, args...)
+		obj.Outputf(2, LOG_DEBUG, format, args...)
 	}
 }
 
 // Warnf 记录WARN级别格式化日志
 func Warnf(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_WARN, nil, format, args...)
+		obj.Outputf(2, LOG_WARN, format, args...)
 	}
 }
 
 // Infof 记录INFO级别格式化日志
 func Infof(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_INFO, nil, format, args...)
+		obj.Outputf(2, LOG_INFO, format, args...)
 	}
 }
 
 // Errorf 记录ERROR级别格式化日志
 func Errorf(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_ERROR, nil, format, args...)
+		obj.Outputf(2, LOG_ERROR, format, args...)
 	}
 }
 
 // Fatalf 记录FATAL级别格式化日志
 func Fatalf(format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(2, LOG_FATAL, nil, format, args...)
+		obj.Outputf(2, LOG_FATAL, format, args...)
 	}
 }
 
 func Trace(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_TRACE, nil, args...)
+		obj.Output(2, LOG_TRACE, args...)
 	}
 }
 
 func Debug(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_DEBUG, nil, args...)
+		obj.Output(2, LOG_DEBUG, args...)
 	}
 }
 
 func Warn(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_WARN, nil, args...)
+		obj.Output(2, LOG_WARN, args...)
 	}
 }
 
 func Info(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_INFO, nil, args...)
+		obj.Output(2, LOG_INFO, args...)
 	}
 }
 
 func Error(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_ERROR, nil, args...)
+		obj.Output(2, LOG_ERROR, args...)
 	}
 }
 
 func Fatal(args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(2, LOG_FATAL, nil, args...)
+		obj.Output(2, LOG_FATAL, args...)
 	}
 }
 
-func Output(skip int, level int32, head *packet.Head, args ...any) {
+func Output(skip int, level int32, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Output(skip+1, level, head, args...)
+		obj.Output(skip+1, level, args...)
 	}
 }
 
-func Outputf(skip int, level int32, head *packet.Head, format string, args ...any) {
+func Outputf(skip int, level int32, format string, args ...any) {
 	if obj := object.Load(); obj != nil {
-		obj.Outputf(skip+1, level, head, format, args...)
+		obj.Outputf(skip+1, level, format, args...)
 	}
 }
