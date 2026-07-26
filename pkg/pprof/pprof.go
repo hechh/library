@@ -1,0 +1,56 @@
+package pprof
+
+import (
+	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"sync"
+
+	"github.com/hechh/library/pkg/mlog"
+)
+
+var object *Pprof
+
+func SetObject(oj *Pprof) {
+	object = oj
+}
+
+func Close() {
+	if object != nil {
+		object.Close()
+	}
+}
+
+type Pprof struct {
+	mu     sync.Mutex
+	server *http.Server
+	port   int
+}
+
+func (p *Pprof) Init(port int) error {
+	p.port = port
+	addr := fmt.Sprintf("localhost:%d", p.port)
+	p.server = &http.Server{
+		Addr:    addr,
+		Handler: http.DefaultServeMux, // 复用 DefaultServeMux（net/http/pprof 已注册）
+	}
+	go func() {
+		mlog.Infof("[pprof] 启动性能分析服务: http://%s/debug/pprof/", addr)
+		if err := p.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			mlog.Errorf("[pprof] 启动失败: %v", err)
+		}
+	}()
+	return nil
+}
+
+func (p *Pprof) Close() {
+	if p.server != nil {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if err := p.server.Close(); err != nil {
+			mlog.Errorf("[pprof] 关闭失败: %v", err)
+		} else {
+			mlog.Infof("[pprof] 已关闭性能分析服务")
+		}
+	}
+}
