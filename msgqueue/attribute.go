@@ -42,6 +42,10 @@ func GenId() uint64 {
 	return atomic.AddUint64(&msgqueueId, 1)
 }
 
+func (d *Attribute) GetIdleTime() int64 {
+	return d.idleSecond
+}
+
 func (d *Attribute) GetSize() int {
 	return d.size
 }
@@ -104,6 +108,22 @@ func (d *Attribute) OnDelete() {
 	if d.deleteFunc != nil {
 		d.deleteFunc()
 	}
+}
+
+func (d *Attribute) ToOptions() (rets []Option) {
+	rets = append(
+		rets,
+		WithName(d.GetName()),
+		WithId(d.GetId()),
+		WithSize(d.GetSize()),
+		WithIdleTime(d.GetIdleTime()),
+		WithDeleter(d.deleteFunc),
+		WithLocker(d.lockSecond, d.lockFunc, d.unlockFunc),
+	)
+	for _, tt := range d.timers {
+		rets = append(rets, WithTimer(tt.name, tt.interval, tt.times))
+	}
+	return
 }
 
 type Option func(*Attribute)
