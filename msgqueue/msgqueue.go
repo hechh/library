@@ -33,7 +33,6 @@ func (d *MsgQueue) Start(opts ...Option) bool {
 	for _, opt := range opts {
 		opt(d.Attribute)
 	}
-
 	if !d.IsRunning() {
 		// 启动任务队列
 		d.startWg.Add(1)
