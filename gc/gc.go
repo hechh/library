@@ -6,6 +6,18 @@ import (
 	"github.com/hechh/library/base/queue"
 )
 
+var object *Gc
+
+func SetObject(oj *Gc) {
+	object = oj
+}
+
+func Destroy(f func()) {
+	if object != nil {
+		object.Push(f)
+	}
+}
+
 type Gc struct {
 	wg       sync.WaitGroup       // 等待所有任务完成
 	tasks    *queue.Queue[func()] // 任务队列

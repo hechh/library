@@ -16,25 +16,31 @@ import (
 	"github.com/hechh/library/base/datetime"
 )
 
-const (
-	CACHE_FLUSH_INTERVAL_MS = 500         // 缓存刷新间隔
-	CACHE_BUFFER_SIZE       = 1024 * 1024 // 缓存大小
-)
-
 type Config struct {
-	Mode   string `yaml:"mode,omitempty"`   // 日志模式（debug/release）
-	Path   string `yaml:"path,omitempty"`   // 日志文件路径
-	Level  string `yaml:"level,omitempty"`  // 日志级别
-	Format string `yaml:"format,omitempty"` // 日志格式（text/json）
-	Name   string `yaml:"name,omitempty"`   // 日志名称
+	Mode     string `yaml:"mode,omitempty"`   // 日志模式（debug/release）
+	Path     string `yaml:"path,omitempty"`   // 日志文件路径
+	Level    string `yaml:"level,omitempty"`  // 日志级别
+	Format   string `yaml:"format,omitempty"` // 日志格式（text/json）
+	Name     string `yaml:"name,omitempty"`   // 日志名称
+	IsCaller bool   `yaml:"is_caller"`        // 是否开启runtime输出
+	Cache    int    `yaml:"cache"`            // 缓存大小
+}
+
+// jsonLogEntry JSON 日志条目结构（sonic 零分配序列化）
+type Entry struct {
+	TS    string `json:"ts,omitempty"`
+	Level string `json:"level,omitempty"`
+	File  string `json:"file,omitempty"`
+	Tag   string `json:"tag,omitempty"`
+	Msg   any    `json:"msg,omitempty"`
 }
 
 type Logger struct {
 	level    atomic.Int32
+	format   atomic.Int32
+	caller   atomic.Bool
 	writer   atomic.Pointer[GroupWriter]
 	dataPool sync.Pool
-	caller   atomic.Bool
-	format   atomic.Int32
 }
 
 // NewLogger 创建新的日志记录器
@@ -43,7 +49,7 @@ func NewLogger() *Logger {
 		dataPool: sync.Pool{
 			New: func() any {
 				buf := &bytes.Buffer{}
-				buf.Grow(256)
+				buf.Grow(1024)
 				return buf
 			},
 		},
@@ -60,24 +66,29 @@ func NewLogger() *Logger {
 func (l *Logger) Init(cfg *Config) error {
 	l.level.Store(Name2Level(cfg.Level))
 	l.format.Store(Name2Format(cfg.Format))
+	l.caller.Store(cfg.IsCaller)
+
+	if cfg.Cache <= 0 {
+		cfg.Cache = 1024 * 1024
+	}
+
 	switch strings.ToLower(cfg.Mode) {
 	case "debug":
-		l.EnableCaller()
+		l.caller.Store(true)
 		l.writer.Store(&GroupWriter{
 			list: []IWriter{&StdoutWriter{}},
 		})
 	case "release":
 		l.writer.Store(&GroupWriter{
 			list: []IWriter{
-				NewRotateWriter(cfg.Path, cfg.Name, CACHE_BUFFER_SIZE, time.Duration(CACHE_FLUSH_INTERVAL_MS)*time.Millisecond, RollingByHour),
+				NewRotateWriter(cfg.Path, cfg.Name, cfg.Cache, time.Second, RollingByHour),
 			},
 		})
 	default:
-		l.EnableCaller()
 		l.writer.Store(&GroupWriter{
 			list: []IWriter{
 				&StdoutWriter{},
-				NewRotateWriter(cfg.Path, cfg.Name, CACHE_BUFFER_SIZE, time.Duration(CACHE_FLUSH_INTERVAL_MS)*time.Millisecond, RollingByDay),
+				NewRotateWriter(cfg.Path, cfg.Name, cfg.Cache, time.Second, RollingByDay),
 			},
 		})
 	}
@@ -92,20 +103,12 @@ func (l *Logger) SetLevel(level int32) {
 	l.level.Store(level)
 }
 
-func (l *Logger) GetLevel() int32 {
-	return l.level.Load()
-}
-
 func (l *Logger) SetFormat(f int32) {
 	l.format.Store(f)
 }
 
-func (l *Logger) DisableCaller() {
-	l.caller.Store(false)
-}
-
-func (l *Logger) EnableCaller() {
-	l.caller.Store(true)
+func (l *Logger) SetCaller(val bool) {
+	l.caller.Store(val)
 }
 
 func (l *Logger) get() *bytes.Buffer {
@@ -208,21 +211,12 @@ func (l *Logger) outputf(skip int, level int32, format string, args ...any) {
 	}
 }
 
-// jsonLogEntry JSON 日志条目结构（sonic 零分配序列化）
-type jsonLogEntry struct {
-	TS    string `json:"ts"`
-	Level string `json:"level"`
-	File  string `json:"file,omitempty"`
-	Tag   string `json:"tag"`
-	Msg   any    `json:"msg"`
-}
-
 // outputJSON 输出 JSON 格式日志。msgOrArgs 可以是格式化字符串或多个参数。
 func (l *Logger) outputj(skip int, level int32, msgOrArgs ...any) {
 	buff := l.get()
 	defer l.put(buff)
 	now := datetime.Now()
-	entry := jsonLogEntry{
+	entry := Entry{
 		TS:    now.Format("2006-01-02T15:04:05.000Z07:00"),
 		Level: Level2Name(level),
 		Msg:   msgOrArgs,
@@ -244,7 +238,7 @@ func (l *Logger) outputjf(skip int, level int32, format string, msgOrArgs ...any
 	defer l.put(buff)
 	fmt.Fprintf(buff, format, msgOrArgs...)
 	now := datetime.Now()
-	entry := jsonLogEntry{
+	entry := Entry{
 		TS:    now.Format("2006-01-02T15:04:05.000Z07:00"),
 		Level: Level2Name(level),
 		Msg:   buff.String(),

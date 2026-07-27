@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-type ITask interface {
-	IsEnable() bool   // 是否可用
-	GetTTL() int64    // 获取有效时长
-	GetExpire() int64 // 任务触发时间点
-	Refresh(int64)    // 刷新任务触发时间点
-	Call()            // 执行任务
-	String() string   // 格式化
-}
-
 type Task struct {
 	f      func()  // 定时任务
 	id     *uint64 // 唯一任务id

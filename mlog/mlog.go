@@ -87,15 +87,9 @@ func SetFormat(f int32) {
 	}
 }
 
-func DisableCaller() {
+func SetCaller(val bool) {
 	if obj := object.Load(); obj != nil {
-		obj.DisableCaller()
-	}
-}
-
-func EnableCaller() {
-	if obj := object.Load(); obj != nil {
-		obj.EnableCaller()
+		obj.SetCaller(val)
 	}
 }
 
