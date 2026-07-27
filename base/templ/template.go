@@ -51,6 +51,14 @@ func Or[T any](flag bool, a, b T) T {
 	return b
 }
 
+func Map2List[K comparable, V comparable](vals map[K]V) (rets []K) {
+	rets = make([]K, 0, len(vals))
+	for k := range vals {
+		rets = append(rets, k)
+	}
+	return
+}
+
 // ------------------ 数组相关 ------------------
 // Index 获取数组指定位置的元素，如果位置超出范围则返回默认值
 func Index[T any](arr []T, pos int, def T) T {
