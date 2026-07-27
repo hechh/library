@@ -34,6 +34,14 @@ type Attribute struct {
 	unlockFunc func(uint64) error                // 全局任务解锁函数
 }
 
+var (
+	msgqueueId uint64
+)
+
+func GenId() uint64 {
+	return atomic.AddUint64(&msgqueueId, 1)
+}
+
 func (d *Attribute) GetSize() int {
 	return d.size
 }
@@ -103,6 +111,12 @@ type Option func(*Attribute)
 func WithName(name string) Option {
 	return func(opt *Attribute) {
 		opt.name = name
+	}
+}
+
+func WithId(id uint64) Option {
+	return func(opt *Attribute) {
+		opt.id = id
 	}
 }
 

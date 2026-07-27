@@ -36,8 +36,10 @@ func (d *MsgQueuePool[T]) Start(opts ...Option) bool {
 	for _, opt := range opts {
 		opt(d.Attribute)
 	}
+	if d.Attribute.id <= 0 {
+		d.Attribute.id = GenId()
+	}
 	d.taskCh = make(chan T, 5*d.GetSize())
-
 	if !d.IsRunning() {
 		// 启动任务队列
 		d.startWg.Add(1)
