@@ -1,17 +1,20 @@
-package miniredis
+package mockredis
 
 import (
 	"strconv"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/hechh/library/redispool"
 	"github.com/hechh/library/redispool/adapter/goredis"
-
-	"github.com/alicebob/miniredis/v2"
 )
 
 type Client struct {
 	*goredis.Client
 	miniredis *miniredis.Miniredis
+}
+
+func New() *Client {
+	return new(Client)
 }
 
 func (m *Client) Init(cfg *redispool.DbConfig) error {

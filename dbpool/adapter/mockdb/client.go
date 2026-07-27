@@ -1,4 +1,4 @@
-package sqlite
+package mockdb
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ type Client struct {
 	isAlive int32
 }
 
-func NewClient() *Client {
+func New() *Client {
 	return &Client{}
 }
 

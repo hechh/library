@@ -100,9 +100,9 @@ type RedisPool struct {
 	shards      map[uint32]IClient // 分片数据库连接池
 }
 
-func NewRedisPool[T any](f func() *T) *RedisPool {
+func NewRedisPool[T IClient](f func() T) *RedisPool {
 	return &RedisPool{
-		newFunc: func() IClient { return any(f()).(IClient) },
+		newFunc: func() IClient { return f() },
 		globals: make(map[string]IClient),
 		shards:  make(map[uint32]IClient),
 	}

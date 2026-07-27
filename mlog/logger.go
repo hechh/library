@@ -121,32 +121,32 @@ func (l *Logger) put(buf *bytes.Buffer) {
 	l.dataPool.Put(buf)
 }
 
-func (l *Logger) Output(skip int, level int32, args ...any) {
+func (l *Logger) Output(skip int, level int32, tag string, args ...any) {
 	if l.level.Load() > level {
 		return
 	}
 	switch l.format.Load() {
 	case FORMAT_JSON:
-		l.outputj(skip+1, level, args...)
+		l.outputj(skip+1, level, tag, args...)
 	default:
-		l.output(skip+1, level, args...)
+		l.output(skip+1, level, tag, args...)
 	}
 }
 
-func (l *Logger) Outputf(skip int, level int32, format string, args ...any) {
+func (l *Logger) Outputf(skip int, level int32, tag string, format string, args ...any) {
 	if l.level.Load() > level {
 		return
 	}
 	switch l.format.Load() {
 	case FORMAT_JSON:
-		l.outputjf(skip+1, level, format, args...)
+		l.outputjf(skip+1, level, tag, format, args...)
 	default:
-		l.outputf(skip+1, level, format, args...)
+		l.outputf(skip+1, level, tag, format, args...)
 	}
 }
 
 // writeHeader 写入日志公共头部（时间戳、级别、标签、调用者信息），返回 buffer 和当前时间
-func (l *Logger) writeHeader(skip int, level int32) (buff *bytes.Buffer, now time.Time) {
+func (l *Logger) writeHeader(skip int, level int32, tag string) (buff *bytes.Buffer, now time.Time) {
 	buff = l.get()
 	now = datetime.Now()
 	buff.WriteByte('[')
@@ -156,11 +156,11 @@ func (l *Logger) writeHeader(skip int, level int32) (buff *bytes.Buffer, now tim
 	buff.WriteByte('[')
 	buff.WriteString(Level2Name(level))
 	buff.WriteByte(']')
+	buff.WriteByte(' ')
 
 	// 获取调用信息（生产环境可跳过，避免栈回溯开销）
 	if l.caller.Load() {
 		if _, file, line, ok := runtime.Caller(skip); ok {
-			buff.WriteByte(' ')
 			buff.WriteString(filepath.Base(file))
 			buff.WriteByte(':')
 			buff.Write(strconv.AppendInt(nil, int64(line), 10))
@@ -168,12 +168,17 @@ func (l *Logger) writeHeader(skip int, level int32) (buff *bytes.Buffer, now tim
 			// buff.WriteString(filepath.Base(runtime.FuncForPC(pc).Name()))
 		}
 	}
+
+	if tag != "" {
+		buff.WriteByte(' ')
+		buff.WriteString(tag)
+	}
 	return
 }
 
 // Output 输出可变参数日志（JSON 序列化）
-func (l *Logger) output(skip int, level int32, args ...any) {
-	buff, now := l.writeHeader(skip+1, level)
+func (l *Logger) output(skip int, level int32, tag string, args ...any) {
+	buff, now := l.writeHeader(skip+1, level, tag)
 	defer l.put(buff)
 
 	buff.WriteByte(' ')
@@ -198,8 +203,8 @@ func (l *Logger) output(skip int, level int32, args ...any) {
 }
 
 // Outputf 输出格式化日志
-func (l *Logger) outputf(skip int, level int32, format string, args ...any) {
-	buff, now := l.writeHeader(skip+1, level)
+func (l *Logger) outputf(skip int, level int32, tag, format string, args ...any) {
+	buff, now := l.writeHeader(skip+1, level, tag)
 	defer l.put(buff)
 
 	buff.WriteByte(' ')
@@ -212,13 +217,14 @@ func (l *Logger) outputf(skip int, level int32, format string, args ...any) {
 }
 
 // outputJSON 输出 JSON 格式日志。msgOrArgs 可以是格式化字符串或多个参数。
-func (l *Logger) outputj(skip int, level int32, msgOrArgs ...any) {
+func (l *Logger) outputj(skip int, level int32, tag string, msgOrArgs ...any) {
 	buff := l.get()
 	defer l.put(buff)
 	now := datetime.Now()
-	entry := Entry{
+	entry := &Entry{
 		TS:    now.Format("2006-01-02T15:04:05.000Z07:00"),
 		Level: Level2Name(level),
+		Tag:   tag,
 		Msg:   msgOrArgs,
 	}
 	if l.caller.Load() {
@@ -233,7 +239,7 @@ func (l *Logger) outputj(skip int, level int32, msgOrArgs ...any) {
 }
 
 // outputJSON 输出 JSON 格式日志。msgOrArgs 可以是格式化字符串或多个参数。
-func (l *Logger) outputjf(skip int, level int32, format string, msgOrArgs ...any) {
+func (l *Logger) outputjf(skip int, level int32, tag, format string, msgOrArgs ...any) {
 	buff := l.get()
 	defer l.put(buff)
 	fmt.Fprintf(buff, format, msgOrArgs...)
@@ -241,6 +247,7 @@ func (l *Logger) outputjf(skip int, level int32, format string, msgOrArgs ...any
 	entry := Entry{
 		TS:    now.Format("2006-01-02T15:04:05.000Z07:00"),
 		Level: Level2Name(level),
+		Tag:   tag,
 		Msg:   buff.String(),
 	}
 	if l.caller.Load() {
