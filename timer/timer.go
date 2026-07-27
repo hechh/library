@@ -15,7 +15,6 @@ type ITask interface {
 	GetExpire() int64 // 任务触发时间点
 	Refresh(int64)    // 刷新任务触发时间点
 	Call()            // 执行任务
-	String() string   // 格式化
 }
 
 type ITimer interface {
