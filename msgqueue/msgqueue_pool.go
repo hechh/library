@@ -10,33 +10,33 @@ import (
 	"github.com/hechh/library/mlog"
 )
 
-type MsgQueuePool struct {
-	*Attribute                     // 基础
-	tasks      *queue.Queue[ITask] // 任务队列
-	notifyCh   chan struct{}       // 通知
-	exitCh     chan struct{}       // 退出
-	taskCh     chan ITask          // 任务抢占队列
-	updateTime int64               // 更新时间
-	lockTime   int64               // 更新时间
-	w1         sync.WaitGroup      // 等待 run goroutine 退出
-	w2         sync.WaitGroup      // 等待 run goroutine 退出
-	startWg    sync.WaitGroup      // 启动状态
+type MsgQueuePool[T ITask] struct {
+	*Attribute                 // 基础
+	tasks      *queue.Queue[T] // 任务队列
+	notifyCh   chan struct{}   // 通知
+	exitCh     chan struct{}   // 退出
+	taskCh     chan T          // 任务抢占队列
+	updateTime int64           // 更新时间
+	lockTime   int64           // 更新时间
+	w1         sync.WaitGroup  // 等待 run goroutine 退出
+	w2         sync.WaitGroup  // 等待 run goroutine 退出
+	startWg    sync.WaitGroup  // 启动状态
 }
 
-func NewMsgQueuePool() *MsgQueuePool {
-	return &MsgQueuePool{
+func NewMsgQueuePool[T ITask]() *MsgQueuePool[T] {
+	return &MsgQueuePool[T]{
 		Attribute: new(Attribute),
-		tasks:     queue.NewQueue[ITask](),
+		tasks:     queue.NewQueue[T](),
 		notifyCh:  make(chan struct{}, 1),
 		exitCh:    make(chan struct{}),
 	}
 }
 
-func (d *MsgQueuePool) Start(opts ...Option) bool {
+func (d *MsgQueuePool[T]) Start(opts ...Option) bool {
 	for _, opt := range opts {
 		opt(d.Attribute)
 	}
-	d.taskCh = make(chan ITask, 5*d.GetSize())
+	d.taskCh = make(chan T, 5*d.GetSize())
 
 	if !d.IsRunning() {
 		// 启动任务队列
@@ -65,7 +65,7 @@ func (d *MsgQueuePool) Start(opts ...Option) bool {
 	return true
 }
 
-func (d *MsgQueuePool) Stop() {
+func (d *MsgQueuePool[T]) Stop() {
 	if !d.IsStopped() {
 		close(d.exitCh)
 		d.Stopped()
@@ -73,7 +73,7 @@ func (d *MsgQueuePool) Stop() {
 	}
 }
 
-func (d *MsgQueuePool) Wait() {
+func (d *MsgQueuePool[T]) Wait() {
 	id := d.GetId()
 	d.SetId(0)
 	d.w1.Wait()
@@ -82,7 +82,7 @@ func (d *MsgQueuePool) Wait() {
 	mlog.Infof("%s(%d)关闭成功", d.name, id)
 }
 
-func (d *MsgQueuePool) Push(t ITask) (flag bool) {
+func (d *MsgQueuePool[T]) Push(t T) (flag bool) {
 	flag = d.IsRunning()
 	if flag {
 		d.tasks.Push(t, func() {
@@ -96,7 +96,7 @@ func (d *MsgQueuePool) Push(t ITask) (flag bool) {
 	return flag
 }
 
-func (d *MsgQueuePool) run() {
+func (d *MsgQueuePool[T]) run() {
 	defer d.w1.Done()
 
 	// 先抢占锁
@@ -142,8 +142,12 @@ func (d *MsgQueuePool) run() {
 	}
 }
 
-func (d *MsgQueuePool) handle() {
-	for f := d.tasks.Pop(); f != nil; f = d.tasks.Pop() {
+func (d *MsgQueuePool[T]) handle() {
+	for {
+		f, ok := d.tasks.Pop()
+		if !ok {
+			return
+		}
 		d.taskCh <- f
 	}
 }

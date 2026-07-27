@@ -183,7 +183,11 @@ func (d *RotateWriter) run() {
 }
 
 func (d *RotateWriter) handler() {
-	for item := d.list.Pop(); item != nil; item = d.list.Pop() {
+	for {
+		item, ok := d.list.Pop()
+		if !ok {
+			return
+		}
 		if d.isRotate(item.now) {
 			d.cache.Set(d.getFilename(item.now))
 		}

@@ -38,16 +38,16 @@ func (d *Queue[T]) Push(val T, cb func()) int32 {
 	addNode.next.Store(nil)
 	prevNode := d.tail.Swap(addNode)
 	prevNode.next.Store(addNode)
-
 	// 通知
+	count := d.count.Add(1)
 	if cb != nil {
 		cb()
 	}
-	return d.count.Add(1)
+	return count
 }
 
-// TryPop 尝试从队列弹出元素，如果队列为空或 CAS 失败则返回零值和 false
-func (d *Queue[T]) Pop() (ret T) {
+// Pop 尝试从队列弹出元素，如果队列为空或 CAS 失败则返回零值和 false
+func (d *Queue[T]) Pop() (ret T, ok bool) {
 	head := d.head.Load()
 	next := head.next.Load()
 	if next == nil {
@@ -59,5 +59,5 @@ func (d *Queue[T]) Pop() (ret T) {
 	d.count.Add(-1)
 	ret = next.value
 	d.pool.Put(head)
-	return ret
+	return ret, true
 }

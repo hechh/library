@@ -112,7 +112,11 @@ func (d *Timer) run() {
 					wheel.Refresh(begin)
 
 					// 移动任务
-					for item := bucket.Pop(); item != nil; item = bucket.Pop() {
+					for {
+						item, ok := bucket.Pop()
+						if !ok {
+							break
+						}
 						if item.GetExpire()-nowMs <= d.period {
 							d.taskCh <- item
 						} else {

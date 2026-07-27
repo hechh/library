@@ -9,27 +9,27 @@ import (
 	"github.com/hechh/library/mlog"
 )
 
-type MsgQueue struct {
-	*Attribute                     // 基础
-	tasks      *queue.Queue[ITask] // 任务队列
-	notifyCh   chan struct{}       // 通知
-	exitCh     chan struct{}       // 退出
-	updateTime int64               // 更新时间
-	lockTime   int64               // 全局锁保活
-	wg         sync.WaitGroup      // 等待任务完成
-	startWg    sync.WaitGroup      // 启动状态
+type MsgQueue[T ITask] struct {
+	*Attribute                 // 基础
+	tasks      *queue.Queue[T] // 任务队列
+	notifyCh   chan struct{}   // 通知
+	exitCh     chan struct{}   // 退出
+	updateTime int64           // 更新时间
+	lockTime   int64           // 全局锁保活
+	wg         sync.WaitGroup  // 等待任务完成
+	startWg    sync.WaitGroup  // 启动状态
 }
 
-func NewMsgQueue() *MsgQueue {
-	return &MsgQueue{
+func NewMsgQueue[T ITask]() *MsgQueue[T] {
+	return &MsgQueue[T]{
 		Attribute: new(Attribute),
-		tasks:     queue.NewQueue[ITask](),
+		tasks:     queue.NewQueue[T](),
 		notifyCh:  make(chan struct{}, 1),
 		exitCh:    make(chan struct{}),
 	}
 }
 
-func (d *MsgQueue) Start(opts ...Option) bool {
+func (d *MsgQueue[T]) Start(opts ...Option) bool {
 	for _, opt := range opts {
 		opt(d.Attribute)
 	}
@@ -49,7 +49,7 @@ func (d *MsgQueue) Start(opts ...Option) bool {
 	return true
 }
 
-func (d *MsgQueue) Stop() {
+func (d *MsgQueue[T]) Stop() {
 	if !d.IsStopped() {
 		close(d.exitCh)
 		d.Stopped()
@@ -57,14 +57,14 @@ func (d *MsgQueue) Stop() {
 	}
 }
 
-func (d *MsgQueue) Wait() {
+func (d *MsgQueue[T]) Wait() {
 	id := d.GetId()
 	d.SetId(0)
 	d.wg.Wait()
 	mlog.Infof("%s(%d)关闭成功", d.name, id)
 }
 
-func (d *MsgQueue) Push(t ITask) (flag bool) {
+func (d *MsgQueue[T]) Push(t T) (flag bool) {
 	flag = d.IsRunning()
 	if flag {
 		d.tasks.Push(t, func() {
@@ -78,7 +78,7 @@ func (d *MsgQueue) Push(t ITask) (flag bool) {
 	return flag
 }
 
-func (d *MsgQueue) run() {
+func (d *MsgQueue[T]) run() {
 	defer d.wg.Done()
 
 	// 先抢占锁
@@ -124,8 +124,12 @@ func (d *MsgQueue) run() {
 	}
 }
 
-func (d *MsgQueue) handle() {
-	for f := d.tasks.Pop(); f != nil; f = d.tasks.Pop() {
+func (d *MsgQueue[T]) handle() {
+	for {
+		f, ok := d.tasks.Pop()
+		if !ok {
+			return
+		}
 		if f.Do() {
 			d.updateTime = time.Now().Unix()
 		}

@@ -51,7 +51,11 @@ func (d *Gc) Push(f func()) {
 
 func (d *Gc) run() {
 	defer func() {
-		for f := d.tasks.Pop(); f != nil; f = d.tasks.Pop() {
+		for {
+			f, ok := d.tasks.Pop()
+			if !ok {
+				break
+			}
 			f()
 		}
 		d.wg.Done()
@@ -60,7 +64,11 @@ func (d *Gc) run() {
 	for {
 		select {
 		case <-d.notifyCh:
-			for f := d.tasks.Pop(); f != nil; f = d.tasks.Pop() {
+			for {
+				f, ok := d.tasks.Pop()
+				if !ok {
+					break
+				}
 				f()
 			}
 		case <-d.exitCh:
