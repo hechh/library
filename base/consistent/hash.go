@@ -8,34 +8,33 @@ import (
 )
 
 type INode interface {
-	GetType() uint32
 	GetId() uint32
 }
 
 // Hash 一致性哈希实现
-type Hash struct {
+type Hash[T INode] struct {
 	mu       sync.RWMutex
-	nodes    map[uint32]INode // 真实节点
-	virtual  map[uint32]INode // 虚拟节点
-	hashRing []uint32         // 哈希环（已排序）
-	virtuals int              // 每个真实节点的虚拟节点数
+	nodes    map[uint32]T // 真实节点
+	virtual  map[uint32]T // 虚拟节点
+	hashRing []uint32     // 哈希环（已排序）
+	virtuals int          // 每个真实节点的虚拟节点数
 }
 
 // NewHash 创建一致性哈希实例
-func NewHash(virtuals int) *Hash {
+func NewHash[T INode](virtuals int) *Hash[T] {
 	if virtuals <= 0 {
 		virtuals = 150 // 默认虚拟节点数
 	}
-	return &Hash{
-		nodes:    make(map[uint32]INode),
-		virtual:  make(map[uint32]INode),
+	return &Hash[T]{
+		nodes:    make(map[uint32]T),
+		virtual:  make(map[uint32]T),
 		hashRing: make([]uint32, 0),
 		virtuals: virtuals,
 	}
 }
 
 // AddNode 添加节点
-func (ch *Hash) AddNode(node INode) error {
+func (ch *Hash[T]) AddNode(node T) error {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
@@ -62,14 +61,15 @@ func (ch *Hash) AddNode(node INode) error {
 }
 
 // RemoveNode 移除节点
-func (ch *Hash) RemoveNode(nodeID uint32) INode {
+func (ch *Hash[T]) RemoveNode(nodeID uint32) T {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
 	// 检查节点是否存在
 	node, exists := ch.nodes[nodeID]
 	if !exists {
-		return nil
+		var zero T
+		return zero
 	}
 
 	// 移除真实节点
@@ -89,12 +89,13 @@ func (ch *Hash) RemoveNode(nodeID uint32) INode {
 }
 
 // GetNode 根据key获取对应的节点
-func (ch *Hash) GetNode(key string) INode {
+func (ch *Hash[T]) GetNode(key string) T {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
 	if len(ch.hashRing) == 0 {
-		return nil
+		var zero T
+		return zero
 	}
 
 	// 计算key的哈希值
@@ -115,12 +116,13 @@ func (ch *Hash) GetNode(key string) INode {
 }
 
 // GetNodeByUint64 根据uint64类型的key获取节点
-func (ch *Hash) GetNodeByUint64(key uint64) INode {
+func (ch *Hash[T]) GetNodeByUint64(key uint64) T {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
 	if len(ch.hashRing) == 0 {
-		return nil
+		var zero T
+		return zero
 	}
 
 	// 计算哈希值
@@ -140,61 +142,47 @@ func (ch *Hash) GetNodeByUint64(key uint64) INode {
 }
 
 // GetNodeByID 根据节点ID获取节点
-func (ch *Hash) GetNodeByID(nodeID uint32) INode {
+func (ch *Hash[T]) GetNodeByID(nodeID uint32) T {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 	return ch.nodes[nodeID]
 }
 
 // GetNodes 获取所有节点
-func (ch *Hash) GetNodes() []INode {
+func (ch *Hash[T]) GetNodes() []T {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
-	nodes := make([]INode, 0, len(ch.nodes))
+	nodes := make([]T, 0, len(ch.nodes))
 	for _, node := range ch.nodes {
 		nodes = append(nodes, node)
 	}
 	return nodes
 }
 
-// GetNodesByType 根据类型获取节点列表
-func (ch *Hash) GetNodesByType(nodeType uint32) []INode {
-	ch.mu.RLock()
-	defer ch.mu.RUnlock()
-
-	nodes := make([]INode, 0)
-	for _, node := range ch.nodes {
-		if node.GetType() == nodeType {
-			nodes = append(nodes, node)
-		}
-	}
-	return nodes
-}
-
 // GetNodeCount 获取节点数量
-func (ch *Hash) GetNodeCount() int {
+func (ch *Hash[T]) GetNodeCount() int {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 	return len(ch.nodes)
 }
 
 // GetVirtualNodeCount 获取虚拟节点数量
-func (ch *Hash) GetVirtualNodeCount() int {
+func (ch *Hash[T]) GetVirtualNodeCount() int {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 	return len(ch.virtual)
 }
 
 // hashKey 计算字符串key的哈希值（使用FNV-32a避免内存分配）
-func (ch *Hash) hashKey(key string) uint32 {
+func (ch *Hash[T]) hashKey(key string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return h.Sum32()
 }
 
 // hashUint64 计算uint64 key的哈希值
-func (ch *Hash) hashUint64(key uint64) uint32 {
+func (ch *Hash[T]) hashUint64(key uint64) uint32 {
 	h := fnv.New32a()
 	// 使用高效的二进制写入，避免make和binary.BigEndian
 	var buf [8]byte
@@ -211,7 +199,7 @@ func (ch *Hash) hashUint64(key uint64) uint32 {
 }
 
 // hashVirtualNode 计算虚拟节点的哈希值
-func (ch *Hash) hashVirtualNode(nodeID uint32, index int) uint32 {
+func (ch *Hash[T]) hashVirtualNode(nodeID uint32, index int) uint32 {
 	h := fnv.New32a()
 	// 手动格式化字符串避免 fmt.Sprintf 的内存分配
 	// 格式: "nodeID:index"，nodeID 最大 10位，index 最大 10位，加冒号 1位，共 21 字节
@@ -269,7 +257,7 @@ func (ch *Hash) hashVirtualNode(nodeID uint32, index int) uint32 {
 }
 
 // GetNodesForKey 获取某个key的所有备份节点（用于故障转移）
-func (ch *Hash) GetNodesForKey(key string, count int) []INode {
+func (ch *Hash[T]) GetNodesForKey(key string, count int) []T {
 	ch.mu.RLock()
 	defer ch.mu.RUnlock()
 
@@ -278,7 +266,7 @@ func (ch *Hash) GetNodesForKey(key string, count int) []INode {
 	}
 
 	hash := ch.hashKey(key)
-	nodes := make([]INode, 0, count)
+	nodes := make([]T, 0, count)
 	seen := make(map[uint32]bool)
 
 	// 获取前count个不同真实节点
@@ -302,21 +290,17 @@ func (ch *Hash) GetNodesForKey(key string, count int) []INode {
 }
 
 // Clear 清空所有节点
-func (ch *Hash) Clear() {
+func (ch *Hash[T]) Clear() {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
-	ch.nodes = make(map[uint32]INode)
-	ch.virtual = make(map[uint32]INode)
+	ch.nodes = make(map[uint32]T)
+	ch.virtual = make(map[uint32]T)
 	ch.hashRing = make([]uint32, 0)
 }
 
 // UpdateNode 更新节点信息
-func (ch *Hash) UpdateNode(node INode) error {
-	if node == nil {
-		return fmt.Errorf("node cannot be nil")
-	}
-
+func (ch *Hash[T]) UpdateNode(node T) error {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
