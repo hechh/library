@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ankur-anand/taskwheel"
+	"github.com/hechh/library/base/datetime"
 	"github.com/hechh/library/timer"
 )
 
@@ -48,7 +49,7 @@ func (d *Timer) Init(cfg *timer.Config) error {
 
 			// 如果任务仍有效，重新注册
 			if task.IsEnable() {
-				now := time.Now().UnixMilli()
+				now := datetime.NowUnixMilli()
 				task.Refresh(now)
 				newID := atomic.AddUint64(&item.id, 1)
 				_, _ = d.wheel.AfterTimeout(

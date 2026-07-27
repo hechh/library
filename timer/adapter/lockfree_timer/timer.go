@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hechh/library/base/datetime"
 	"github.com/hechh/library/base/safe"
 	"github.com/hechh/library/mlog"
 	"github.com/hechh/library/timer"
@@ -61,11 +62,11 @@ func (d *Timer) Init(cfg *timer.Config) error {
 	}
 
 	// 初始化
-	now := time.Now().UnixMilli()
+	nowMs := datetime.NowUnixMilli()
 	for _, wheel := range d.wheels {
-		wheel.Refresh(now)
+		wheel.Refresh(nowMs)
 	}
-	d.startTime = now
+	d.startTime = nowMs
 
 	// 启动执行协程
 	for range d.wheelSize {
@@ -97,8 +98,8 @@ func (d *Timer) run() {
 			return
 		case <-tt.C:
 			// 使用 tick 计数器避免 bucket 排空耗时导致后续 tick 被跳过
-			now := time.Now().UnixMilli()
-			tickCount := (now - d.startTime) / d.period
+			nowMs := datetime.NowUnixMilli()
+			tickCount := (nowMs - d.startTime) / d.period
 			for i := int64(1); i <= tickCount; i++ {
 				begin := d.startTime + i*d.period
 				for _, wheel := range d.wheels {
@@ -112,7 +113,7 @@ func (d *Timer) run() {
 
 					// 移动任务
 					for item := bucket.Pop(); item != nil; item = bucket.Pop() {
-						if item.GetExpire()-now <= d.period {
+						if item.GetExpire()-nowMs <= d.period {
 							d.taskCh <- item
 						} else {
 							d.Register(item)
@@ -142,7 +143,7 @@ func (d *Timer) consume() {
 
 			// 判断任务是否
 			if item.IsEnable() {
-				item.Refresh(time.Now().UnixMilli())
+				item.Refresh(datetime.NowUnixMilli())
 				d.Register(item)
 			}
 		}
