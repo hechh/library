@@ -66,7 +66,9 @@ func (m *EmbedSync) Init(cfg *fwatcher.Config) error {
 		return fmt.Errorf("mock configure: server start timeout")
 	}
 
-	// 将嵌入式 etcd 的本地地址作为 endpoint，委托 Configure.Init 完成客户端初始化
+	// 将嵌入式 etcd 的实际地址写入 config，再委托 EtcdSync.Init 完成客户端初始化
+	actualEndpoint := fmt.Sprintf("http://%s", clientPort)
+	cfg.Etcd.Endpoints = []string{actualEndpoint}
 	return m.EtcdSync.Init(cfg)
 }
 

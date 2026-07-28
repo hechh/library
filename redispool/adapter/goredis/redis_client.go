@@ -15,6 +15,10 @@ type Client struct {
 	prefix string
 }
 
+func New() *Client {
+	return new(Client)
+}
+
 // handleRedisError 将 redis.Nil 转换为 nil，避免上层误判
 func handleRedisError(err error) error {
 	if err == nil || err == redis.Nil {

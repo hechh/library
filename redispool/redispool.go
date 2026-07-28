@@ -75,7 +75,7 @@ type IClient interface {
 // DbConfig 数据库分片配置
 type DbConfig struct {
 	ShardsId uint32              `yaml:"shards_id,omitempty"` // 分片ID
-	DbName   string              `yaml:"db_name,omitempty"`   // 数据库名称
+	DbName   string              `yaml:"dbname,omitempty"`    // 数据库名称
 	Db       uint32              `yaml:"db,omitempty"`        // 数据库编号
 	User     string              `yaml:"user,omitempty"`      // 数据库用户名
 	Password string              `yaml:"password,omitempty"`  // 数据库密码
