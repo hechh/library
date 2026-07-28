@@ -6,7 +6,6 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"golang.org/x/tools/imports"
 )
@@ -79,28 +78,40 @@ func ParseFiles(v ast.Visitor, files ...string) error {
 	return nil
 }
 
-// Glob 遍历目录所有文件
-func Glob(dir, pattern string, recursive bool) (rets []string, err error) {
-	pre, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil, err
+func Glob(pattern string, isRecursive bool) ([]string, error) {
+	if !isRecursive {
+		return filepath.Glob(pattern)
 	}
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		// 不深度迭代
-		if !recursive && info.IsDir() && dir != path {
-			return filepath.SkipDir
+
+	// 递归模式：
+	// 1. 提取目录和文件名模式
+	dir, filePattern := filepath.Split(pattern)
+	if dir == "" {
+		dir = "."
+	}
+	// 如果 dir 为空或 "."，则从当前目录开始
+
+	// 2. 遍历目录树
+	var matches []string
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			// 遇到权限错误等，可选择跳过或返回错误
+			return nil // 跳过该文件/目录继续
 		}
-		// 过滤目录
-		if info.IsDir() {
-			return nil
+		if d.IsDir() {
+			return nil // 继续遍历子目录
 		}
-		// 是否配置
-		if pre.MatchString(path) {
-			rets = append(rets, path)
+		// 检查文件名是否匹配模式（仅匹配文件名，不包含路径）
+		ok, err := filepath.Match(filePattern, d.Name())
+		if err != nil {
+			return err // 模式语法错误
+		}
+		if ok {
+			matches = append(matches, path)
 		}
 		return nil
 	})
-	return
+	return matches, err
 }
 
 func SearchFile(filename string, depth int) string {
