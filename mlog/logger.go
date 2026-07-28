@@ -17,13 +17,13 @@ import (
 )
 
 type Config struct {
-	Mode     string `yaml:"mode,omitempty"`   // 日志模式（debug/release）
-	Path     string `yaml:"path,omitempty"`   // 日志文件路径
-	Level    string `yaml:"level,omitempty"`  // 日志级别
-	Format   string `yaml:"format,omitempty"` // 日志格式（text/json）
-	Name     string `yaml:"name,omitempty"`   // 日志名称
-	IsCaller bool   `yaml:"is_caller"`        // 是否开启runtime输出
-	Cache    int    `yaml:"cache"`            // 缓存大小
+	Mode      string `yaml:"mode,omitempty"`   // 日志模式（debug/release）
+	Path      string `yaml:"path,omitempty"`   // 日志文件路径
+	Level     string `yaml:"level,omitempty"`  // 日志级别
+	Format    string `yaml:"format,omitempty"` // 日志格式（text/json）
+	Name      string `yaml:"name,omitempty"`   // 日志名称
+	IsCaller  bool   `yaml:"is_caller"`        // 是否开启runtime输出
+	CacheSize int    `yaml:"cache_size"`       // 缓存大小
 }
 
 // jsonLogEntry JSON 日志条目结构（sonic 零分配序列化）
@@ -68,8 +68,8 @@ func (l *Logger) Init(cfg *Config) error {
 	l.format.Store(Name2Format(cfg.Format))
 	l.caller.Store(cfg.IsCaller)
 
-	if cfg.Cache <= 0 {
-		cfg.Cache = 1024 * 1024
+	if cfg.CacheSize <= 0 {
+		cfg.CacheSize = 1024 * 1024
 	}
 
 	switch strings.ToLower(cfg.Mode) {
@@ -81,14 +81,14 @@ func (l *Logger) Init(cfg *Config) error {
 	case "release":
 		l.writer.Store(&GroupWriter{
 			list: []IWriter{
-				NewRotateWriter(cfg.Path, cfg.Name, cfg.Cache, time.Second, RollingByHour),
+				NewRotateWriter(cfg.Path, cfg.Name, cfg.CacheSize, time.Second, RollingByHour),
 			},
 		})
 	default:
 		l.writer.Store(&GroupWriter{
 			list: []IWriter{
 				&StdoutWriter{},
-				NewRotateWriter(cfg.Path, cfg.Name, cfg.Cache, time.Second, RollingByDay),
+				NewRotateWriter(cfg.Path, cfg.Name, cfg.CacheSize, time.Second, RollingByDay),
 			},
 		})
 	}
