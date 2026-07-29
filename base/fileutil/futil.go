@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/stretchr/testify/assert/yaml"
 	"golang.org/x/tools/imports"
 )
 
@@ -123,4 +124,12 @@ func SearchFile(filename string, depth int) string {
 		return ""
 	}
 	return SearchFile(filepath.Join("..", filename), depth-1)
+}
+
+func LoadYaml(filename string, val any) error {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(content, val)
 }

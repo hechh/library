@@ -15,20 +15,13 @@ type ITask interface {
 	Do() bool
 }
 
-type Timer struct {
-	name     string
-	interval time.Duration
-	times    int32
-}
-
 type Attribute struct {
 	name       string                            // 名字
 	id         uint64                            // 唯一id
 	status     int32                             // 状态
 	size       int                               // 协程池大小
 	idleSecond int64                             // 闲置时间（秒）
-	timers     []*Timer                          // 定时器
-	deleteFunc func()                            // 删除函数
+	deleteFunc func(uint64)                      // 删除函数
 	lockSecond int64                             // lock有效时长
 	lockFunc   func(uint64, time.Duration) error // 全局任务锁
 	unlockFunc func(uint64) error                // 全局任务解锁函数
@@ -106,7 +99,7 @@ func (d *Attribute) OnUnlock() error {
 
 func (d *Attribute) OnDelete() {
 	if d.deleteFunc != nil {
-		d.deleteFunc()
+		d.deleteFunc(d.GetId())
 	}
 }
 
@@ -120,9 +113,6 @@ func (d *Attribute) ToOptions() (rets []Option) {
 		WithDeleter(d.deleteFunc),
 		WithLocker(d.lockSecond, d.lockFunc, d.unlockFunc),
 	)
-	for _, tt := range d.timers {
-		rets = append(rets, WithTimer(tt.name, tt.interval, tt.times))
-	}
 	return
 }
 
@@ -152,7 +142,7 @@ func WithIdleTime(idle int64) Option {
 	}
 }
 
-func WithDeleter(f func()) Option {
+func WithDeleter(f func(uint64)) Option {
 	return func(opt *Attribute) {
 		opt.deleteFunc = f
 	}
@@ -163,15 +153,5 @@ func WithLocker(expire int64, lock func(uint64, time.Duration) error, unlock fun
 		opt.lockSecond = expire
 		opt.lockFunc = lock
 		opt.unlockFunc = unlock
-	}
-}
-
-func WithTimer(name string, interval time.Duration, times int32) Option {
-	return func(opt *Attribute) {
-		opt.timers = append(opt.timers, &Timer{
-			name:     name,
-			interval: interval,
-			times:    times,
-		})
 	}
 }

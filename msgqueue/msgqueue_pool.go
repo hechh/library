@@ -23,48 +23,30 @@ type MsgQueuePool[T ITask] struct {
 	startWg    sync.WaitGroup  // 启动状态
 }
 
-func NewMsgQueuePool[T ITask]() *MsgQueuePool[T] {
+func NewMsgQueuePool[T ITask](opts ...Option) *MsgQueuePool[T] {
+	attr := new(Attribute)
+	for _, opt := range opts {
+		opt(attr)
+	}
+	if attr.id <= 0 {
+		attr.id = GenId()
+	}
 	return &MsgQueuePool[T]{
-		Attribute: new(Attribute),
+		Attribute: attr,
 		tasks:     queue.NewQueue[T](),
 		notifyCh:  make(chan struct{}, 1),
 		exitCh:    make(chan struct{}),
 	}
 }
 
-func (d *MsgQueuePool[T]) Start(opts ...Option) bool {
-	for _, opt := range opts {
-		opt(d.Attribute)
-	}
-	if d.Attribute.id <= 0 {
-		d.Attribute.id = GenId()
-	}
-	d.taskCh = make(chan T, 5*d.GetSize())
-	if !d.IsRunning() {
-		// 启动任务队列
+func (d *MsgQueuePool[T]) Start() bool {
+	if d.IsStopped() {
 		d.startWg.Add(1)
 		d.w1.Add(1)
 		safe.SafeGo(mlog.Fatalf, d.run)
 		d.startWg.Wait()
-		// 判断是否已经启动
-		if !d.IsWaiting() {
-			return false
-		}
-		// 启动处理协程
-		for range d.GetSize() {
-			d.w2.Add(1)
-			safe.SafeGo(mlog.Fatalf, func() {
-				defer d.w2.Done()
-				for task := range d.taskCh {
-					if task.Do() {
-						atomic.StoreInt64(&d.updateTime, time.Now().Unix())
-					}
-				}
-			})
-		}
-		d.Running()
 	}
-	return true
+	return d.IsRunning()
 }
 
 func (d *MsgQueuePool[T]) Stop() {
@@ -72,16 +54,19 @@ func (d *MsgQueuePool[T]) Stop() {
 		close(d.exitCh)
 		d.Stopped()
 		d.OnDelete()
+		d.Waiting()
 	}
 }
 
 func (d *MsgQueuePool[T]) Wait() {
-	id := d.GetId()
-	d.SetId(0)
-	d.w1.Wait()
-	close(d.taskCh)
-	d.w2.Wait()
-	mlog.Infof("%s(%d)关闭成功", d.name, id)
+	if d.IsWaiting() {
+		id := d.GetId()
+		d.SetId(0)
+		d.w1.Wait()
+		close(d.taskCh)
+		d.w2.Wait()
+		mlog.Infof("%s(%d)关闭成功", d.name, id)
+	}
 }
 
 func (d *MsgQueuePool[T]) Push(t T) (flag bool) {
@@ -98,6 +83,22 @@ func (d *MsgQueuePool[T]) Push(t T) (flag bool) {
 	return flag
 }
 
+func (d *MsgQueuePool[T]) start() {
+	// 启动成功
+	d.taskCh = make(chan T, 5*d.GetSize())
+	for range d.GetSize() {
+		d.w2.Add(1)
+		safe.SafeGo(mlog.Fatalf, func() {
+			defer d.w2.Done()
+			for task := range d.taskCh {
+				if task.Do() {
+					atomic.StoreInt64(&d.updateTime, time.Now().Unix())
+				}
+			}
+		})
+	}
+}
+
 func (d *MsgQueuePool[T]) run() {
 	defer d.w1.Done()
 
@@ -107,8 +108,8 @@ func (d *MsgQueuePool[T]) run() {
 		return
 	}
 
-	// 启动成功
-	d.Waiting()
+	d.start()
+	d.Running()
 	d.startWg.Done()
 
 	// 保活全局锁
@@ -145,11 +146,17 @@ func (d *MsgQueuePool[T]) run() {
 }
 
 func (d *MsgQueuePool[T]) handle() {
-	for {
+	for range 100 {
 		f, ok := d.tasks.Pop()
 		if !ok {
 			return
 		}
 		d.taskCh <- f
+	}
+	if d.tasks.GetCount() > 0 {
+		select {
+		case d.notifyCh <- struct{}{}:
+		default:
+		}
 	}
 }

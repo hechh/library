@@ -20,51 +20,49 @@ type MsgQueue[T ITask] struct {
 	startWg    sync.WaitGroup  // 启动状态
 }
 
-func NewMsgQueue[T ITask]() *MsgQueue[T] {
+func NewMsgQueue[T ITask](opts ...Option) *MsgQueue[T] {
+	attr := new(Attribute)
+	for _, opt := range opts {
+		opt(attr)
+	}
+	if attr.id <= 0 {
+		attr.id = GenId()
+	}
 	return &MsgQueue[T]{
-		Attribute: new(Attribute),
+		Attribute: attr,
 		tasks:     queue.NewQueue[T](),
 		notifyCh:  make(chan struct{}, 1),
 		exitCh:    make(chan struct{}),
 	}
 }
 
-func (d *MsgQueue[T]) Start(opts ...Option) bool {
-	for _, opt := range opts {
-		opt(d.Attribute)
-	}
-	if d.Attribute.id <= 0 {
-		d.Attribute.id = GenId()
-	}
-	if !d.IsRunning() {
-		// 启动任务队列
+func (d *MsgQueue[T]) Start() bool {
+	if d.IsStopped() {
 		d.startWg.Add(1)
 		d.wg.Add(1)
 		safe.SafeGo(mlog.Fatalf, d.run)
 		d.startWg.Wait()
-		// 判断是否已经启动
-		if !d.IsWaiting() {
-			return false
-		}
-		// 启动
-		d.Running()
 	}
-	return true
+	return d.IsRunning()
 }
 
 func (d *MsgQueue[T]) Stop() {
-	if !d.IsStopped() {
+	if d.IsRunning() {
 		close(d.exitCh)
 		d.Stopped()
 		d.OnDelete()
+		d.Waiting()
 	}
 }
 
 func (d *MsgQueue[T]) Wait() {
-	id := d.GetId()
-	d.SetId(0)
-	d.wg.Wait()
-	mlog.Infof("%s(%d)关闭成功", d.name, id)
+	if d.IsWaiting() {
+		id := d.GetId()
+		d.SetId(0)
+		d.wg.Wait()
+		mlog.Infof("%s(%d)关闭成功", d.name, id)
+		d.Stopped()
+	}
 }
 
 func (d *MsgQueue[T]) Push(t T) (flag bool) {
@@ -91,7 +89,7 @@ func (d *MsgQueue[T]) run() {
 	}
 
 	// 启动成功
-	d.Waiting()
+	d.Running()
 	d.startWg.Done()
 
 	// 保活全局锁
@@ -128,13 +126,19 @@ func (d *MsgQueue[T]) run() {
 }
 
 func (d *MsgQueue[T]) handle() {
-	for {
+	for range 100 {
 		f, ok := d.tasks.Pop()
 		if !ok {
 			return
 		}
 		if f.Do() {
 			d.updateTime = time.Now().Unix()
+		}
+	}
+	if d.tasks.GetCount() > 0 {
+		select {
+		case d.notifyCh <- struct{}{}:
+		default:
 		}
 	}
 }
