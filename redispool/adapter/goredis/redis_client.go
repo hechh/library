@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/hechh/library/base/utils"
 	"github.com/hechh/library/redispool"
 )
 
 // Client Redis客户端封装，组合go-redis.Client并添加key前缀支持
 type Client struct {
+	uuid uint32
 	*redis.Client
 	prefix string
 }
@@ -26,6 +28,8 @@ func handleRedisError(err error) error {
 	}
 	return fmt.Errorf("redis error: %w", err)
 }
+
+func (d *Client) UniqueId() uint32 { return d.uuid }
 
 func (d *Client) Init(cfg *redispool.DbConfig) error {
 	cli := redis.NewClient(&redis.Options{
@@ -55,6 +59,7 @@ func (d *Client) Init(cfg *redispool.DbConfig) error {
 		return fmt.Errorf("redis ping: %w", err)
 	}
 
+	d.uuid = utils.GetCrc32(fmt.Sprintf("%s-%d", cfg.DbName, cfg.ShardsId))
 	d.Client = cli
 	d.prefix = cfg.Prefix
 	return nil
