@@ -51,10 +51,18 @@ func Or[T any](flag bool, a, b T) T {
 	return b
 }
 
-func Map2List[K comparable, V any](vals map[K]V) (rets []K) {
+func Map2Keys[K comparable, V any](vals map[K]V) (rets []K) {
 	rets = make([]K, 0, len(vals))
 	for k := range vals {
 		rets = append(rets, k)
+	}
+	return
+}
+
+func Map2Values[K comparable, V any](vals map[K]V) (rets []V) {
+	rets = make([]V, 0, len(vals))
+	for _, v := range vals {
+		rets = append(rets, v)
 	}
 	return
 }

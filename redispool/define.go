@@ -2,9 +2,11 @@ package redispool
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/hechh/library/base/safe"
 )
 
 const (
@@ -21,21 +23,24 @@ type Message interface {
 	UnmarshalVT([]byte) error
 }
 
-type IString interface {
+type IData interface {
+	UniqueId() uint32
 	GetClient() IClient
 	GetMask() uint32
-	GetKey() string
 	Unmarshal([]byte) (Message, error)
 	Marshal(Message) ([]byte, error)
-}
-
-type IHash interface {
-	GetClient() IClient
-	GetMask() uint32
 	GetKey() string
 	GetField() string
-	Unmarshal([]byte) (Message, error)
-	Marshal(Message) ([]byte, error)
+}
+
+type ICache interface {
+	GetTypes() []IData
+	AddType(IData)
+	SetCache(string, any, uint32)
+	GetCache(string) (any, bool)
+	IsChanged(string) bool
+	Change(string)
+	Reset(string)
 }
 
 type IClient interface {
@@ -102,4 +107,37 @@ type IClient interface {
 	HKeys(key string) ([]string, error)
 	HLen(key string) (int64, error)
 	HSetNX(key, field string, value any) (bool, error)
+}
+
+func getTypes(ca ICache, list ...IData) []IData {
+	filter := map[uint32]struct{}{}
+	temps := ca.GetTypes()
+	rets := make([]IData, 0, len(temps)+len(list))
+	for _, item := range temps {
+		id := item.UniqueId()
+		if _, ok := filter[id]; !ok {
+			filter[id] = struct{}{}
+			rets = append(rets, item)
+		}
+	}
+	for _, item := range list {
+		id := item.UniqueId()
+		if _, ok := filter[id]; !ok {
+			filter[id] = struct{}{}
+			rets = append(rets, item)
+		}
+	}
+	return rets
+}
+
+func unmarshal(d IData, val any) (Message, error) {
+	switch v := val.(type) {
+	case string:
+		return d.Unmarshal(safe.StringToBytes(v))
+	case []byte:
+		return d.Unmarshal(v)
+	case nil:
+		return d.Unmarshal(nil)
+	}
+	return nil, fmt.Errorf("类型不支持: %T", val)
 }

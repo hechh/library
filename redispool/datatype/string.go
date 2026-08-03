@@ -23,6 +23,7 @@ type StringType3[R any, I any, A any, B any, C any] struct {
 	c       C
 }
 
+func (d *StringType0[R, I]) GetField() string             { return "" }
 func (d *StringType0[R, I]) GetClient() redispool.IClient { return d.DataType.GetClient(d.i) }
 func (d *StringType0[R, I]) GetKey() string               { return d.keyFunc() }
 func (d *StringType1[R, I, A]) GetKey() string            { return d.keyFunc(d.a) }

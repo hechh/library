@@ -1,175 +1,293 @@
 package redispool
 
 import (
+	"github.com/hechh/library/base/logic"
 	"github.com/hechh/library/base/safe"
+	"github.com/hechh/library/base/templ"
+	"github.com/hechh/library/base/tuple"
 )
 
-func MGet(list ...IString) (map[string]Message, error) {
-	items := make(map[uint32][]IString)
-	for _, item := range list {
-		uuid := item.GetClient().UniqueId()
-		items[uuid] = append(items[uuid], item)
+func Load(ca ICache, list ...IData) (map[string]Message, error) {
+	type data struct {
+		client IClient
+		key    string
+		list   []IData
+		args   []string
 	}
-
+	list = getTypes(ca, list...)
 	result := make(map[string]Message, len(list))
-	for _, vals := range items {
-		client := vals[0].GetClient()
-
-		// 构造MGet参数
-		args := make([]string, 0, len(vals))
-		for _, item := range vals {
-			args = append(args, item.GetKey())
+	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
+	for _, item := range list {
+		key := item.GetKey()
+		field := item.GetField()
+		cacheKey := key + field
+		if value, ok := ca.GetCache(cacheKey); ok {
+			result[cacheKey] = value.(Message)
+			continue
 		}
-
-		// 批量加载数据
-		values, err := client.MGet(args...)
+		mask := item.GetMask()
+		cid := item.GetClient().UniqueId()
+		kk := tuple.T3(mask, cid, templ.Or(logic.Has(mask, HASH_FLAG), item.UniqueId(), 0))
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient()}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		if logic.Has(item.GetMask(), STRING_FLAG) {
+			vv.args = append(vv.args, key)
+		} else if logic.Has(item.GetMask(), HASH_FLAG) {
+			vv.args = append(vv.args, field)
+			vv.key = key
+		}
+	}
+	for kk, vv := range items {
+		var values []any
+		var err error
+		if logic.Has(kk.V1, STRING_FLAG) {
+			values, err = vv.client.MGet(vv.args...)
+		} else if logic.Has(kk.V1, HASH_FLAG) {
+			values, err = vv.client.HMGet(vv.key, vv.args...)
+		}
 		if err != nil {
 			return nil, err
 		}
-
-		// 解析数据
 		for i, value := range values {
-			var obj Message
-			var err error
-			switch v := value.(type) {
-			case string:
-				obj, err = vals[i].Unmarshal(safe.StringToBytes(v))
-			case []byte:
-				obj, err = vals[i].Unmarshal(v)
-			case nil:
-				obj, err = vals[i].Unmarshal(nil)
-			}
+			obj, err := unmarshal(vv.list[i], value)
 			if err != nil {
 				return nil, err
 			}
-			result[args[i]] = obj
+			hkey := templ.Or(logic.Has(kk.V1, STRING_FLAG), vv.args[i], vv.key+vv.args[i])
+			result[hkey] = obj
+			ca.SetCache(hkey, obj, vv.list[i].GetMask())
 		}
 	}
 	return result, nil
 }
 
-func MSet(list []IString, data map[string]Message) error {
-	items := make(map[uint32][]IString)
-	for _, item := range list {
-		uuid := item.GetClient().UniqueId()
-		items[uuid] = append(items[uuid], item)
+func Save(ca ICache, list ...IData) (reterr error) {
+	type data struct {
+		client IClient
+		key    string
+		list   []IData
+		args   []any
 	}
-
-	var reterr error
-	for _, vals := range items {
-		client := vals[0].GetClient()
-
-		// 构造MGet参数
-		args := make([]any, 0, len(vals)*2)
-		for _, item := range vals {
-			key := item.GetKey()
-			val, ok := data[key]
-			if !ok {
-				continue
-			}
-
-			buff, err := item.Marshal(val)
-			if err != nil {
-				return err
-			}
-			args = append(args, key, safe.BytesToString(buff))
+	list = getTypes(ca, list...)
+	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
+	for _, item := range list {
+		key := item.GetKey()
+		field := item.GetField()
+		cacheKey := key + field
+		if !ca.IsChanged(cacheKey) {
+			continue
 		}
-
-		// 批量保存数据
-		if err := client.MSet(args...); err != nil {
+		val, _ := ca.GetCache(cacheKey)
+		buff, err := item.Marshal(val.(Message))
+		if err != nil {
+			return err
+		}
+		mask := item.GetMask()
+		cid := item.GetClient().UniqueId()
+		kk := tuple.T3(mask, cid, templ.Or(logic.Has(mask, HASH_FLAG), item.UniqueId(), 0))
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient()}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		if logic.Has(kk.V1, STRING_FLAG) {
+			vv.args = append(vv.args, key, safe.BytesToString(buff))
+		} else if logic.Has(kk.V1, HASH_FLAG) {
+			vv.args = append(vv.args, field, safe.BytesToString(buff))
+			vv.key = key
+		}
+	}
+	// 批量保存 hash field 数据
+	for _, vv := range items {
+		if err := vv.client.HMSet(vv.key, vv.args...); err != nil {
 			reterr = err
 		}
 	}
-	return reterr
+	return nil
 }
 
-func HMGet(list ...IHash) (map[string]Message, error) {
-	// 按 (UniqueId, Key) 分组，同一 hash key 下的多个 field 可合并为单次 HMGet
-	type groupKey struct {
-		uuid uint32
-		key  string
+func MGet(ca ICache, list ...IData) (map[string]Message, error) {
+	type data struct {
+		client IClient
+		list   []IData
+		args   []string
 	}
-	items := make(map[groupKey][]IHash)
-	for _, item := range list {
-		gk := groupKey{uuid: item.GetClient().UniqueId(), key: item.GetKey()}
-		items[gk] = append(items[gk], item)
-	}
-
+	list = getTypes(ca, list...)
 	result := make(map[string]Message, len(list))
-	for _, vals := range items {
-		client := vals[0].GetClient()
-		key := vals[0].GetKey()
-
-		// 构造 HMGet 的 fields 参数
-		fields := make([]string, 0, len(vals))
-		for _, item := range vals {
-			fields = append(fields, item.GetField())
+	items := make(map[tuple.Tuple2[uint32, uint32]]*data)
+	for _, item := range list {
+		mask := item.GetMask()
+		if logic.Has(mask, HASH_FLAG) {
+			continue
 		}
-
-		// 批量加载 hash field 数据
-		values, err := client.HMGet(key, fields...)
+		key := item.GetKey()
+		if value, ok := ca.GetCache(key); ok {
+			result[key] = value.(Message)
+			continue
+		}
+		kk := tuple.T2(mask, item.GetClient().UniqueId())
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient()}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		vv.args = append(vv.args, key)
+	}
+	// 批量加载数据
+	for _, vv := range items {
+		values, err := vv.client.MGet(vv.args...)
 		if err != nil {
 			return nil, err
 		}
-
 		// 解析数据
 		for i, value := range values {
-			var obj Message
-			var err error
-			switch v := value.(type) {
-			case string:
-				obj, err = vals[i].Unmarshal(safe.StringToBytes(v))
-			case []byte:
-				obj, err = vals[i].Unmarshal(v)
-			case nil:
-				obj, err = vals[i].Unmarshal(nil)
-			}
+			obj, err := unmarshal(vv.list[i], value)
 			if err != nil {
 				return nil, err
 			}
-			result[fields[i]] = obj
+			result[vv.args[i]] = obj
+			ca.SetCache(vv.args[i], obj, vv.list[i].GetMask())
 		}
 	}
 	return result, nil
 }
 
-func HMSet(list []IHash, data map[string]Message) error {
-	// 按 (UniqueId, Key) 分组，同一 hash key 下的多个 field 可合并为单次 HMSet
-	type groupKey struct {
-		uuid uint32
-		key  string
+func MSet(ca ICache, list ...IData) (reterr error) {
+	type data struct {
+		client IClient
+		list   []IData
+		args   []any
 	}
-	items := make(map[groupKey][]IHash)
+	list = getTypes(ca, list...)
+	items := make(map[tuple.Tuple2[uint32, uint32]]*data)
 	for _, item := range list {
-		gk := groupKey{uuid: item.GetClient().UniqueId(), key: item.GetKey()}
-		items[gk] = append(items[gk], item)
-	}
-
-	var reterr error
-	for _, vals := range items {
-		client := vals[0].GetClient()
-		key := vals[0].GetKey()
-
-		// 构造 HMSet 的 field-value 参数对
-		args := make([]any, 0, len(vals)*2)
-		for _, item := range vals {
-			field := item.GetField()
-			val, ok := data[field]
-			if !ok {
-				continue
-			}
-
-			buff, err := item.Marshal(val)
-			if err != nil {
-				return err
-			}
-			args = append(args, field, safe.BytesToString(buff))
+		mask := item.GetMask()
+		if logic.Has(mask, HASH_FLAG) {
+			continue
 		}
-
-		// 批量保存 hash field 数据
-		if err := client.HMSet(key, args...); err != nil {
+		key := item.GetKey()
+		if !ca.IsChanged(key) {
+			continue
+		}
+		val, _ := ca.GetCache(key)
+		buff, err := item.Marshal(val.(Message))
+		if err != nil {
+			return err
+		}
+		kk := tuple.T2(mask, item.GetClient().UniqueId())
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient()}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		vv.args = append(vv.args, key, safe.BytesToString(buff))
+	}
+	// 批量保存数据
+	for _, vv := range items {
+		if err := vv.client.MSet(vv.args...); err != nil {
 			reterr = err
 		}
 	}
-	return reterr
+	return
+}
+
+func HMGet(ca ICache, list ...IData) (map[string]Message, error) {
+	type data struct {
+		client IClient
+		key    string
+		list   []IData
+		args   []string
+	}
+	list = getTypes(ca, list...)
+	result := make(map[string]Message, len(list))
+	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
+	for _, item := range list {
+		mask := item.GetMask()
+		if logic.Has(mask, STRING_FLAG) {
+			continue
+		}
+		key := item.GetKey()
+		field := item.GetField()
+		cacheKey := key + field
+		if value, ok := ca.GetCache(cacheKey); ok {
+			result[cacheKey] = value.(Message)
+			continue
+		}
+		kk := tuple.T3(mask, item.GetClient().UniqueId(), item.UniqueId())
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient(), key: key}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		vv.args = append(vv.args, field)
+	}
+	// 批量加载 hash field 数据
+	for _, vv := range items {
+		values, err := vv.client.HMGet(vv.key, vv.args...)
+		if err != nil {
+			return nil, err
+		}
+		// 解析数据
+		for i, value := range values {
+			obj, err := unmarshal(vv.list[i], value)
+			if err != nil {
+				return nil, err
+			}
+			cacheKey := vv.key + vv.args[i]
+			result[cacheKey] = obj
+			ca.SetCache(cacheKey, obj, vv.list[i].GetMask())
+		}
+	}
+	return result, nil
+}
+
+func HMSet(ca ICache, list ...IData) (reterr error) {
+	type data struct {
+		client IClient
+		key    string
+		list   []IData
+		args   []any
+	}
+	list = getTypes(ca, list...)
+	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
+	for _, item := range list {
+		mask := item.GetMask()
+		if logic.Has(mask, STRING_FLAG) {
+			continue
+		}
+		key := item.GetKey()
+		field := item.GetField()
+		cacheKey := key + field
+		if !ca.IsChanged(cacheKey) {
+			continue
+		}
+		val, _ := ca.GetCache(cacheKey)
+		buff, err := item.Marshal(val.(Message))
+		if err != nil {
+			return err
+		}
+		kk := tuple.T3(mask, item.GetClient().UniqueId(), item.UniqueId())
+		vv, ok := items[kk]
+		if !ok {
+			vv = &data{client: item.GetClient(), key: key}
+			items[kk] = vv
+		}
+		vv.list = append(vv.list, item)
+		vv.args = append(vv.args, field, safe.BytesToString(buff))
+	}
+	// 批量保存 hash field 数据
+	for _, vv := range items {
+		if err := vv.client.HMSet(vv.key, vv.args...); err != nil {
+			reterr = err
+		}
+	}
+	return
 }
