@@ -69,7 +69,6 @@ func Save(ca ICache, list ...IData) (reterr error) {
 	type data struct {
 		client IClient
 		key    string
-		list   []IData
 		args   []any
 	}
 	list = getTypes(ca, list...)
@@ -77,14 +76,15 @@ func Save(ca ICache, list ...IData) (reterr error) {
 	for _, item := range list {
 		key := item.GetKey()
 		field := item.GetField()
+		var buff []byte
 		cacheKey := key + field
 		if !ca.IsChanged(cacheKey) {
 			continue
 		}
 		val, _ := ca.GetCache(cacheKey)
-		buff, err := item.Marshal(val.(Message))
-		if err != nil {
-			return err
+		buff, reterr = item.Marshal(val.(Message))
+		if reterr != nil {
+			return
 		}
 		mask := item.GetMask()
 		cid := item.GetClient().UniqueId()
@@ -94,7 +94,6 @@ func Save(ca ICache, list ...IData) (reterr error) {
 			vv = &data{client: item.GetClient()}
 			items[kk] = vv
 		}
-		vv.list = append(vv.list, item)
 		if logic.Has(kk.V1, STRING_FLAG) {
 			vv.args = append(vv.args, key, safe.BytesToString(buff))
 		} else if logic.Has(kk.V1, HASH_FLAG) {
@@ -161,7 +160,6 @@ func MGet(ca ICache, list ...IData) (map[string]Message, error) {
 func MSet(ca ICache, list ...IData) (reterr error) {
 	type data struct {
 		client IClient
-		list   []IData
 		args   []any
 	}
 	list = getTypes(ca, list...)
@@ -186,7 +184,6 @@ func MSet(ca ICache, list ...IData) (reterr error) {
 			vv = &data{client: item.GetClient()}
 			items[kk] = vv
 		}
-		vv.list = append(vv.list, item)
 		vv.args = append(vv.args, key, safe.BytesToString(buff))
 	}
 	// 批量保存数据
@@ -253,7 +250,6 @@ func HMSet(ca ICache, list ...IData) (reterr error) {
 	type data struct {
 		client IClient
 		key    string
-		list   []IData
 		args   []any
 	}
 	list = getTypes(ca, list...)
@@ -280,7 +276,6 @@ func HMSet(ca ICache, list ...IData) (reterr error) {
 			vv = &data{client: item.GetClient(), key: key}
 			items[kk] = vv
 		}
-		vv.list = append(vv.list, item)
 		vv.args = append(vv.args, field, safe.BytesToString(buff))
 	}
 	// 批量保存 hash field 数据

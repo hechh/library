@@ -110,24 +110,21 @@ type IClient interface {
 }
 
 func getTypes(ca ICache, list ...IData) []IData {
+	if ca == nil {
+		return list
+	}
 	filter := map[uint32]struct{}{}
-	temps := ca.GetTypes()
-	rets := make([]IData, 0, len(temps)+len(list))
-	for _, item := range temps {
-		id := item.UniqueId()
-		if _, ok := filter[id]; !ok {
-			filter[id] = struct{}{}
-			rets = append(rets, item)
-		}
-	}
 	for _, item := range list {
+		filter[item.UniqueId()] = struct{}{}
+	}
+	for _, item := range ca.GetTypes() {
 		id := item.UniqueId()
 		if _, ok := filter[id]; !ok {
 			filter[id] = struct{}{}
-			rets = append(rets, item)
+			list = append(list, item)
 		}
 	}
-	return rets
+	return list
 }
 
 func unmarshal(d IData, val any) (Message, error) {
