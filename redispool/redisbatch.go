@@ -14,7 +14,7 @@ func Load(ca ICache, list ...IData) (map[string]Message, error) {
 		list   []IData
 		args   []string
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	result := make(map[string]Message, len(list))
 	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
 	for _, item := range list {
@@ -71,7 +71,7 @@ func Save(ca ICache, list ...IData) (reterr error) {
 		key    string
 		args   []any
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
 	for _, item := range list {
 		key := item.GetKey()
@@ -116,7 +116,7 @@ func MGet(ca ICache, list ...IData) (map[string]Message, error) {
 		list   []IData
 		args   []string
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	result := make(map[string]Message, len(list))
 	items := make(map[tuple.Tuple2[uint32, uint32]]*data)
 	for _, item := range list {
@@ -162,7 +162,7 @@ func MSet(ca ICache, list ...IData) (reterr error) {
 		client IClient
 		args   []any
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	items := make(map[tuple.Tuple2[uint32, uint32]]*data)
 	for _, item := range list {
 		mask := item.GetMask()
@@ -202,7 +202,7 @@ func HMGet(ca ICache, list ...IData) (map[string]Message, error) {
 		list   []IData
 		args   []string
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	result := make(map[string]Message, len(list))
 	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
 	for _, item := range list {
@@ -252,7 +252,7 @@ func HMSet(ca ICache, list ...IData) (reterr error) {
 		key    string
 		args   []any
 	}
-	list = getTypes(ca, list...)
+	list = ca.GetTypes(list...)
 	items := make(map[tuple.Tuple3[uint32, uint32, uint32]]*data)
 	for _, item := range list {
 		mask := item.GetMask()

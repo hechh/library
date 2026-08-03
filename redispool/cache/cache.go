@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"github.com/hechh/library/base/templ"
 	"github.com/hechh/library/redispool"
 )
 
@@ -33,8 +32,17 @@ func New(vals map[string]any, typs map[uint32]redispool.IData) *Cache {
 }
 
 // GetTypes 返回已注册的数据类型描述（供 MGet/MSet 批量加载）
-func (d *Cache) GetTypes() []redispool.IData {
-	return templ.Map2Values(d.types)
+func (d *Cache) GetTypes(items ...redispool.IData) []redispool.IData {
+	filter := map[uint32]struct{}{}
+	rets := make([]redispool.IData, 0, len(items)+len(d.types))
+	for _, v := range d.types {
+		id := v.UniqueId()
+		if _, ok := filter[id]; !ok {
+			filter[id] = struct{}{}
+			rets = append(rets, v)
+		}
+	}
+	return rets
 }
 
 // AddType 注册数据类型描述

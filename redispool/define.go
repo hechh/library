@@ -34,7 +34,7 @@ type IData interface {
 }
 
 type ICache interface {
-	GetTypes() []IData
+	GetTypes(...IData) []IData
 	AddType(IData)
 	SetCache(string, any, uint32)
 	GetCache(string) (any, bool)
@@ -107,24 +107,6 @@ type IClient interface {
 	HKeys(key string) ([]string, error)
 	HLen(key string) (int64, error)
 	HSetNX(key, field string, value any) (bool, error)
-}
-
-func getTypes(ca ICache, list ...IData) []IData {
-	if ca == nil {
-		return list
-	}
-	filter := map[uint32]struct{}{}
-	for _, item := range list {
-		filter[item.UniqueId()] = struct{}{}
-	}
-	for _, item := range ca.GetTypes() {
-		id := item.UniqueId()
-		if _, ok := filter[id]; !ok {
-			filter[id] = struct{}{}
-			list = append(list, item)
-		}
-	}
-	return list
 }
 
 func unmarshal(d IData, val any) (Message, error) {

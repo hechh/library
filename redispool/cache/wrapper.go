@@ -10,11 +10,11 @@ func Wrap(data map[string]any) *Wrapper {
 	return &Wrapper{data: data}
 }
 
-func (d *Wrapper) GetTypes() []redispool.IData { return nil }
-func (d *Wrapper) AddType(redispool.IData)     {}
-func (d *Wrapper) IsChanged(string) bool       { return true }
-func (d *Wrapper) Change(string)               {}
-func (d *Wrapper) Reset(string)                {}
+func (d *Wrapper) GetTypes(items ...redispool.IData) []redispool.IData { return items }
+func (d *Wrapper) AddType(redispool.IData)                             {}
+func (d *Wrapper) IsChanged(string) bool                               { return true }
+func (d *Wrapper) Change(string)                                       {}
+func (d *Wrapper) Reset(string)                                        {}
 func (d *Wrapper) SetCache(k string, v any, flag uint32) {
 	d.data[k] = v
 }
