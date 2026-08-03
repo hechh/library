@@ -332,8 +332,8 @@ func YearDay(unix int64) int {
 }
 
 // Date 获取当前日期，格式为YYYYMMDD（如 2026-05-28 → 20260528）
-func Date(t time.Time) int {
-	return t.Year()*10000 + int(t.Month())*100 + t.Day()
+func Date(t time.Time) uint32 {
+	return uint32(t.Year()*10000 + int(t.Month())*100 + t.Day())
 }
 
 // DaysInMonth 获取当月的天数
