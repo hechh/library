@@ -9,17 +9,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-/*
-const (
-	HASH_FLAG      = 1 << 0 // hash数据类型
-	STRING_FLAG    = 1 << 1 // string数据类型
-	GLOBAL_FLAG    = 1 << 2 // 全局数据库
-	SHARDS_FLAG    = 1 << 3 // 分片数据库
-	TEMP_FLAG      = 1 << 4 // 临时数据
-	PERMANENT_FLAG = 1 << 5 // 常驻数据
-)
-*/
-
 type IClient interface {
 	UniqueId() uint32
 	Init(cfg *DbConfig) error
