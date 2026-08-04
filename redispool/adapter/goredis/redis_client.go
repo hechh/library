@@ -59,7 +59,7 @@ func (d *Client) Init(cfg *redispool.DbConfig) error {
 		return fmt.Errorf("redis ping: %w", err)
 	}
 
-	d.uuid = utils.GetCrc32(fmt.Sprintf("%s-%d", cfg.DbName, cfg.ShardsId))
+	d.uuid = utils.GetCrc32(fmt.Sprintf("%s-%d-%d", cfg.DbName, cfg.Db, cfg.ShardsId))
 	d.Client = cli
 	d.prefix = cfg.Prefix
 	return nil

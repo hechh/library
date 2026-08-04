@@ -2,13 +2,14 @@ package redispool
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/hechh/library/base/safe"
+	"github.com/hechh/library/base/templ"
+	"google.golang.org/protobuf/proto"
 )
 
+/*
 const (
 	HASH_FLAG      = 1 << 0 // hash数据类型
 	STRING_FLAG    = 1 << 1 // string数据类型
@@ -17,31 +18,7 @@ const (
 	TEMP_FLAG      = 1 << 4 // 临时数据
 	PERMANENT_FLAG = 1 << 5 // 常驻数据
 )
-
-type Message interface {
-	MarshalVT() ([]byte, error)
-	UnmarshalVT([]byte) error
-}
-
-type IData interface {
-	UniqueId() uint32
-	GetClient() IClient
-	GetMask() uint32
-	Unmarshal([]byte) (Message, error)
-	Marshal(Message) ([]byte, error)
-	GetKey() string
-	GetField() string
-}
-
-type ICache interface {
-	GetTypes(...IData) []IData
-	AddType(IData)
-	SetCache(string, any, uint32)
-	GetCache(string) (any, bool)
-	IsChanged(string) bool
-	Change(string)
-	Reset(string)
-}
+*/
 
 type IClient interface {
 	UniqueId() uint32
@@ -109,14 +86,41 @@ type IClient interface {
 	HSetNX(key, field string, value any) (bool, error)
 }
 
-func unmarshal(d IData, val any) (Message, error) {
-	switch v := val.(type) {
-	case string:
-		return d.Unmarshal(safe.StringToBytes(v))
-	case []byte:
-		return d.Unmarshal(v)
-	case nil:
-		return d.Unmarshal(nil)
+type Message interface {
+	CloneMessageVT() proto.Message
+	MarshalVT() ([]byte, error)
+	UnmarshalVT([]byte) error
+}
+
+type Value struct {
+	IClient
+	Message
+	key   string
+	field string
+	times uint32
+}
+
+func (d *Value) Key() string     { return d.key }
+func (d *Value) Field() string   { return d.field }
+func (d *Value) IsChanged() bool { return d.times > 0 }
+func (d *Value) Change()         { d.times++ }
+func (d *Value) Reset()          { d.times = 0 }
+func (d *Value) Get() any        { return d.Message }
+
+func (d *Value) Clone() *Value {
+	return &Value{
+		IClient: d.IClient,
+		Message: d.CloneMessageVT().(Message),
+		key:     d.key,
+		field:   d.field,
 	}
-	return nil, fmt.Errorf("类型不支持: %T", val)
+}
+
+func NewValue(cli IClient, obj Message, args ...string) *Value {
+	return &Value{
+		IClient: cli,
+		Message: obj,
+		key:     templ.Index(args, 0, ""),
+		field:   templ.Index(args, 1, ""),
+	}
 }
