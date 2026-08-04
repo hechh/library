@@ -59,6 +59,44 @@ func (d *hmget) Save() error {
 	return nil
 }
 
+func Load(args ...*Value) error {
+	strs := map[uint32]*mget{}
+	hashs := map[string]*hmget{}
+	for _, item := range args {
+		id := item.UniqueId()
+		key := item.Key()
+		field := item.Field()
+		if field == "" {
+			val, ok := strs[id]
+			if !ok {
+				val = &mget{}
+				strs[id] = val
+			}
+			val.args = append(val.args, key)
+			val.values = append(val.values, item)
+		} else {
+			val, ok := hashs[key]
+			if !ok {
+				val = &hmget{key: key}
+				hashs[key] = val
+			}
+			val.args = append(val.args, field)
+			val.values = append(val.values, item)
+		}
+	}
+	for _, item := range strs {
+		if err := item.Save(); err != nil {
+			return err
+		}
+	}
+	for _, item := range hashs {
+		if err := item.Save(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func MGet(args ...*Value) error {
 	datas := map[uint32][]*Value{}
 	for _, item := range args {
