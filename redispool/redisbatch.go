@@ -5,16 +5,58 @@ import (
 )
 
 type mget struct {
-	IClient
 	values []*Value
 	args   []string
 }
 
+func (d *mget) Save() error {
+	results, err := d.values[0].MGet(d.args...)
+	if err != nil {
+		return err
+	}
+	for i, val := range results {
+		var err error
+		switch vv := val.(type) {
+		case string:
+			err = d.values[i].UnmarshalVT(safe.StringToBytes(vv))
+		case []byte:
+			err = d.values[i].UnmarshalVT(vv)
+		default:
+			err = d.values[i].UnmarshalVT(nil)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type hmget struct {
-	IClient
 	key    string
 	values []*Value
 	args   []string
+}
+
+func (d *hmget) Save() error {
+	results, err := d.values[0].HMGet(d.key, d.args...)
+	if err != nil {
+		return err
+	}
+	for i, val := range results {
+		var err error
+		switch vv := val.(type) {
+		case string:
+			err = d.values[i].UnmarshalVT(safe.StringToBytes(vv))
+		case []byte:
+			err = d.values[i].UnmarshalVT(vv)
+		default:
+			err = d.values[i].UnmarshalVT(nil)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func MGet(args ...*Value) error {
