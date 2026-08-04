@@ -5,6 +5,14 @@ import (
 )
 
 type mget struct {
+	IClient
+	values []*Value
+	args   []string
+}
+
+type hmget struct {
+	IClient
+	key    string
 	values []*Value
 	args   []string
 }
