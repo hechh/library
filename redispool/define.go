@@ -9,6 +9,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	HASH   = 1
+	STRING = 2
+)
+
 type IClient interface {
 	UniqueId() uint32
 	Init(cfg *DbConfig) error
@@ -82,13 +87,16 @@ type Message interface {
 }
 
 type Value struct {
-	IClient
 	Message
+	cli   IClient
+	class uint32
 	key   string
 	field string
 	times uint32
 }
 
+func (d *Value) Client() IClient { return d.cli }
+func (d *Value) Type() uint32    { return d.class }
 func (d *Value) Key() string     { return d.key }
 func (d *Value) Field() string   { return d.field }
 func (d *Value) IsChanged() bool { return d.times > 0 }
@@ -98,17 +106,19 @@ func (d *Value) Get() any        { return d.Message }
 
 func (d *Value) Clone() *Value {
 	return &Value{
-		IClient: d.IClient,
 		Message: d.CloneMessageVT().(Message),
+		cli:     d.cli,
+		class:   d.class,
 		key:     d.key,
 		field:   d.field,
 	}
 }
 
-func NewValue(cli IClient, obj Message, args ...string) *Value {
+func NewValue(cli IClient, obj Message, t uint32, args ...string) *Value {
 	return &Value{
-		IClient: cli,
 		Message: obj,
+		cli:     cli,
+		class:   t,
 		key:     templ.Index(args, 0, ""),
 		field:   templ.Index(args, 1, ""),
 	}

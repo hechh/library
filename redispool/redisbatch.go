@@ -2,55 +2,20 @@ package redispool
 
 import (
 	"github.com/hechh/library/base/safe"
+	"github.com/hechh/library/base/templ"
+	"github.com/hechh/library/base/tuple"
 )
 
-type mget struct {
-	values []*Value
-	args   []string
-}
-
-func (d *mget) Save() error {
-	results, err := d.values[0].MGet(d.args...)
-	if err != nil {
-		return err
-	}
+func unmarshal(values []*Value, results []any) error {
 	for i, val := range results {
 		var err error
 		switch vv := val.(type) {
 		case string:
-			err = d.values[i].UnmarshalVT(safe.StringToBytes(vv))
+			err = values[i].UnmarshalVT(safe.StringToBytes(vv))
 		case []byte:
-			err = d.values[i].UnmarshalVT(vv)
+			err = values[i].UnmarshalVT(vv)
 		default:
-			err = d.values[i].UnmarshalVT(nil)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type hmget struct {
-	key    string
-	values []*Value
-	args   []string
-}
-
-func (d *hmget) Save() error {
-	results, err := d.values[0].HMGet(d.key, d.args...)
-	if err != nil {
-		return err
-	}
-	for i, val := range results {
-		var err error
-		switch vv := val.(type) {
-		case string:
-			err = d.values[i].UnmarshalVT(safe.StringToBytes(vv))
-		case []byte:
-			err = d.values[i].UnmarshalVT(vv)
-		default:
-			err = d.values[i].UnmarshalVT(nil)
+			err = values[i].UnmarshalVT(nil)
 		}
 		if err != nil {
 			return err
@@ -60,161 +25,83 @@ func (d *hmget) Save() error {
 }
 
 func Load(args ...*Value) error {
-	strs := map[uint32]*mget{}
-	hashs := map[string]*hmget{}
+	type data struct {
+		cli      IClient
+		typeData uint32
+		key      string
+		values   []*Value
+		args     []string
+	}
+	datas := map[tuple.Tuple2[uint32, string]]*data{}
 	for _, item := range args {
-		id := item.UniqueId()
-		key := item.Key()
-		field := item.Field()
-		if field == "" {
-			val, ok := strs[id]
-			if !ok {
-				val = &mget{}
-				strs[id] = val
-			}
-			val.args = append(val.args, key)
-			val.values = append(val.values, item)
+		cli, typeData := item.Client(), item.Type()
+		key, field := item.Key(), item.Field()
+		kk := tuple.T2(cli.UniqueId(), templ.Or(typeData == HASH, key, field))
+		vv, ok := datas[kk]
+		if !ok {
+			vv = &data{cli: cli, typeData: typeData, key: key}
+			datas[kk] = vv
+		}
+		vv.values = append(vv.values, item)
+		vv.args = append(vv.args, templ.Or(typeData == STRING, key, field))
+	}
+	for _, vv := range datas {
+		var results []any
+		var err error
+		if vv.typeData == STRING {
+			results, err = vv.cli.MGet(vv.args...)
 		} else {
-			val, ok := hashs[key]
-			if !ok {
-				val = &hmget{key: key}
-				hashs[key] = val
-			}
-			val.args = append(val.args, field)
-			val.values = append(val.values, item)
+			results, err = vv.cli.HMGet(vv.key, vv.args...)
 		}
-	}
-	for _, item := range strs {
-		if err := item.Save(); err != nil {
+		if err != nil {
 			return err
 		}
-	}
-	for _, item := range hashs {
-		if err := item.Save(); err != nil {
+		if err := unmarshal(vv.values, results); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func MGet(args ...*Value) error {
-	datas := map[uint32][]*Value{}
-	for _, item := range args {
-		id := item.UniqueId()
-		datas[id] = append(datas[id], item)
+func Save(args ...*Value) error {
+	type data struct {
+		client   IClient
+		typeData uint32
+		key      string
+		args     []any
 	}
-
-	for _, values := range datas {
-		args := make([]string, 0, len(values))
-		for _, item := range values {
-			args = append(args, item.Key())
+	datas := map[tuple.Tuple2[uint32, string]]*data{}
+	for _, item := range args {
+		if !item.IsChanged() {
+			continue
 		}
 
-		// 加载数据
-		results, err := values[0].MGet(args...)
+		buff, err := item.MarshalVT()
 		if err != nil {
 			return err
 		}
 
-		// 解析数据
-		for i, val := range results {
-			var err error
-			switch vv := val.(type) {
-			case string:
-				err = values[i].UnmarshalVT(safe.StringToBytes(vv))
-			case []byte:
-				err = values[i].UnmarshalVT(vv)
-			default:
-				err = values[i].UnmarshalVT(nil)
-			}
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
+		cli, typeData := item.Client(), item.Type()
+		key, field := item.Key(), item.Field()
 
-func MSet(args ...*Value) error {
-	datas := map[uint32][]*Value{}
-	for _, item := range args {
-		id := item.UniqueId()
-		datas[id] = append(datas[id], item)
-	}
-
-	for _, values := range datas {
-		// 构造参数
-		args := make([]any, 0, len(values)*2)
-		for _, item := range values {
-			data, err := item.MarshalVT()
-			if err != nil {
-				return err
-			}
-			args = append(args, item.Key(), safe.BytesToString(data))
-		}
-		// 保存数据
-		if err := values[0].MSet(args...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func HMGet(values ...*Value) error {
-	datas := map[string][]*Value{}
-	for _, item := range values {
-		datas[item.Key()] = append(datas[item.Key()], item)
-	}
-
-	for key, values := range datas {
-		args := make([]string, 0, len(values))
-		for _, item := range values {
-			args = append(args, item.Field())
+		kk := tuple.T2(cli.UniqueId(), templ.Or(typeData == HASH, key, field))
+		vv, ok := datas[kk]
+		if !ok {
+			vv = &data{typeData: typeData, key: key, client: cli}
+			datas[kk] = vv
 		}
 
-		// 加载数据
-		results, err := values[0].HMGet(key, args...)
+		kval := templ.Or(typeData == STRING, key, field)
+		vv.args = append(vv.args, kval, safe.BytesToString(buff))
+	}
+	for _, vv := range datas {
+		var err error
+		if vv.typeData == HASH {
+			err = vv.client.HMSet(vv.key, vv.args...)
+		} else {
+			err = vv.client.MSet(vv.args...)
+		}
 		if err != nil {
-			return err
-		}
-
-		// 解析数据
-		for i, value := range results {
-			var err error
-			switch vv := value.(type) {
-			case string:
-				err = values[i].UnmarshalVT(safe.StringToBytes(vv))
-			case []byte:
-				err = values[i].UnmarshalVT(vv)
-			default:
-				err = values[i].UnmarshalVT(nil)
-			}
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func HMSet(args ...*Value) error {
-	datas := map[string][]*Value{}
-	for _, item := range args {
-		datas[item.Key()] = append(datas[item.Key()], item)
-	}
-
-	for key, values := range datas {
-		// 构造参数
-		args := make([]any, 0, len(values)*2)
-		for _, item := range values {
-			data, err := item.MarshalVT()
-			if err != nil {
-				return err
-			}
-			args = append(args, item.Field(), safe.BytesToString(data))
-		}
-		// 保存数据
-		if err := values[0].HMSet(key, args...); err != nil {
 			return err
 		}
 	}
