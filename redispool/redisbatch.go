@@ -107,3 +107,44 @@ func Save(args ...*Value) error {
 	}
 	return nil
 }
+
+func SaveDirectly(args ...*Value) error {
+	type data struct {
+		client   IClient
+		typeData uint32
+		key      string
+		args     []any
+	}
+	datas := map[tuple.Tuple2[uint32, string]]*data{}
+	for _, item := range args {
+		buff, err := item.MarshalVT()
+		if err != nil {
+			return err
+		}
+
+		cli, typeData := item.Client(), item.Type()
+		key, field := item.Key(), item.Field()
+
+		kk := tuple.T2(cli.UniqueId(), templ.Or(typeData == HASH, key, field))
+		vv, ok := datas[kk]
+		if !ok {
+			vv = &data{typeData: typeData, key: key, client: cli}
+			datas[kk] = vv
+		}
+
+		kval := templ.Or(typeData == STRING, key, field)
+		vv.args = append(vv.args, kval, safe.BytesToString(buff))
+	}
+	for _, vv := range datas {
+		var err error
+		if vv.typeData == HASH {
+			err = vv.client.HMSet(vv.key, vv.args...)
+		} else {
+			err = vv.client.MSet(vv.args...)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
