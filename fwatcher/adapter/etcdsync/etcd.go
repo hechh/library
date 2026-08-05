@@ -27,7 +27,7 @@ func NewEtcdSync() *EtcdSync {
 }
 
 func (d *EtcdSync) Init(cfg *fwatcher.Config) error {
-	d.prefix = cfg.Etcd.PrefixTopic
+	d.prefix = cfg.Etcd.Prefix
 	var err error
 	return safe.Retry(3, 3*time.Second, func() error {
 		d.client, err = clientv3.New(clientv3.Config{

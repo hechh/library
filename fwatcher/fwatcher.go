@@ -10,9 +10,9 @@ import (
 )
 
 type EtcdConfig struct {
-	PrefixTopic string   `yaml:"prefix_topic,omitempty"` // etcd 前缀主题
-	Endpoints   []string `yaml:"endpoints,omitempty"`    // etcd 节点地址列表
-	KeepAlive   int64    `yaml:"keep_alive,omitempty"`   // 保活时间（秒）
+	Prefix    string   `yaml:"prefix,omitempty"`     // etcd 前缀主题
+	Endpoints []string `yaml:"endpoints,omitempty"`  // etcd 节点地址列表
+	KeepAlive int64    `yaml:"keep_alive,omitempty"` // 保活时间（秒）
 }
 
 type Config struct {
@@ -75,7 +75,7 @@ func (d *Fwatcher) Init(cfg *Config) error {
 	return d.sync.Watch(func(sheet string, body []byte) {
 		filename := filepath.Join(abspath, sheet+cfg.Ext)
 		if err := registry.Save(sheet, filename, body); err != nil {
-			mlog.Errorf("收到到同步配置，但是保存失败 error=%v", err)
+			mlog.Warnf("收到同步配置，但是保存失败 error=%v", err)
 		}
 	})
 }
