@@ -69,7 +69,7 @@ func (d *MsgQueue[T]) Push(t T) (flag bool) {
 	flag = d.IsRunning()
 	if flag {
 		d.tasks.Push(t, func() {
-			mlog.Tracef("%s任务数量：%d", d.name, d.tasks.GetCount())
+			//mlog.Tracef("%s任务数量：%d", d.name, d.tasks.GetCount())
 			select {
 			case d.notifyCh <- struct{}{}:
 			default:
