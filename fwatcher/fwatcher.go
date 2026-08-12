@@ -3,7 +3,9 @@ package fwatcher
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/hechh/library/base/fileutil"
 	"github.com/hechh/library/fwatcher/internal/registry"
 	"github.com/hechh/library/fwatcher/internal/watcher"
 	"github.com/hechh/library/mlog"
@@ -51,33 +53,41 @@ func NewFwatcher[T ISync](f func() T) *Fwatcher {
 }
 
 func (d *Fwatcher) Init(cfg *Config) error {
-	// 初始化watcher
+	// 确保数据目录存在（远程同步写文件与本地监听都依赖它）
+	abspath, err := filepath.Abs(cfg.DataPath)
+	if err != nil {
+		return err
+	}
+	if err := fileutil.EnsureDir(abspath); err != nil {
+		return err
+	}
+
+	// 第一步：先初始化远程同步，把远程最新配置同步到本地
+	d.sync = d.newFunc()
+	if cfg.Etcd != nil && d.sync != nil {
+		if err := d.sync.Init(cfg); err != nil {
+			return err
+		}
+		// Watch 内部会先同步拉取一次远程全量配置（阻塞完成），再异步监听后续变更
+		if err := d.sync.Watch(func(sheet string, body []byte) {
+			// 回调的 sheet 是 etcd 完整 key(prefix/表名)，剥离前缀得到表名
+			name := strings.TrimPrefix(sheet, cfg.Etcd.Prefix+"/")
+			filename := filepath.Join(abspath, name+cfg.Ext)
+			if err := registry.Save(name, filename, body); err != nil {
+				mlog.Warnf("收到同步配置，但是保存失败 error=%v", err)
+			}
+		}); err != nil {
+			return err
+		}
+	}
+
+	// 第二步：再启动本地监听（此时本地文件已是远程同步后的最新版本）
 	d.local = watcher.NewWatcher(cfg.DataPath, cfg.XlsxPath, cfg.Ext)
 	if err := d.local.Init(); err != nil {
 		return err
 	}
 
-	d.sync = d.newFunc()
-	if cfg.Etcd == nil || d.sync == nil {
-		return nil
-	}
-
-	// 初始化配置同步
-	if err := d.sync.Init(cfg); err != nil {
-		return err
-	}
-
-	abspath, err := filepath.Abs(cfg.DataPath)
-	if err != nil {
-		return err
-	}
-
-	return d.sync.Watch(func(sheet string, body []byte) {
-		filename := filepath.Join(abspath, sheet+cfg.Ext)
-		if err := registry.Save(sheet, filename, body); err != nil {
-			mlog.Warnf("收到同步配置，但是保存失败 error=%v", err)
-		}
-	})
+	return nil
 }
 
 func (d *Fwatcher) Close() {
