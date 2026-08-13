@@ -82,7 +82,7 @@ func (d *Fwatcher) Init(cfg *Config) error {
 	}
 
 	// 第二步：再启动本地监听（此时本地文件已是远程同步后的最新版本）
-	d.local = watcher.NewWatcher(cfg.DataPath, cfg.XlsxPath, cfg.Ext)
+	d.local = watcher.NewWatcher(cfg.DataPath, cfg.Ext)
 	if err := d.local.Init(); err != nil {
 		return err
 	}

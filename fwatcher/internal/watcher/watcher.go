@@ -14,17 +14,15 @@ import (
 
 type Watcher struct {
 	dataPath  string
-	xlsxPath  string
 	ext       string
 	pattern   string
 	fswatcher *fsnotify.Watcher
 	exitCh    chan struct{}
 }
 
-func NewWatcher(dataPath, xlsxPath string, ext string) *Watcher {
+func NewWatcher(dataPath string, ext string) *Watcher {
 	return &Watcher{
 		dataPath: dataPath,
-		xlsxPath: xlsxPath,
 		ext:      ext,
 		exitCh:   make(chan struct{}),
 	}
