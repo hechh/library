@@ -2,6 +2,7 @@ package registry
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +11,6 @@ import (
 	"github.com/hechh/library/base/fileutil"
 	"github.com/hechh/library/fwatcher/internal/parser"
 	"github.com/hechh/library/mlog"
-	"google.golang.org/protobuf/encoding/prototext"
 )
 
 var (
@@ -76,7 +76,7 @@ func Save(sheet, filename string, body []byte) error {
 		return err
 	}
 
-	text, err := prototext.Marshal(ary)
+	text, err := json.Marshal(ary)
 	if err != nil {
 		return err
 	}

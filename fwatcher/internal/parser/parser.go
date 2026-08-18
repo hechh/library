@@ -2,11 +2,11 @@ package parser
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"hash"
 	"sync/atomic"
 
 	"github.com/hechh/library/mlog"
-	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -47,7 +47,7 @@ func (p *Parser[T]) Sheet() string {
 
 func (p *Parser[T]) New(body []byte) (proto.Message, error) {
 	val := any(new(T)).(proto.Message)
-	if err := proto.Unmarshal(body, val); err != nil {
+	if err := json.Unmarshal(body, val); err != nil {
 		return nil, err
 	}
 	return val, nil
@@ -69,9 +69,9 @@ func (p *Parser[T]) Parse(hh hash.Hash, buf []byte) error {
 		return nil
 	}
 
-	// 解析配置内容
+	// 解析配置内容（JSON，键名与 pb.go json tag 一致）
 	ary := new(T)
-	if err := prototext.Unmarshal(buf, any(ary).(proto.Message)); err != nil {
+	if err := json.Unmarshal(buf, ary); err != nil {
 		return err
 	}
 	// 加载配置（如果已注册解析函数）
