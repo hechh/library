@@ -16,7 +16,7 @@ const (
 
 type IClient interface {
 	UniqueId() uint32
-	Init(cfg *DbConfig) error
+	Init(cfg *Config) error
 	Close() error
 	GetRealKey(key string) string
 	Ctx() context.Context

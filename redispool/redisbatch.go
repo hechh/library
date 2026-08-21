@@ -26,9 +26,9 @@ func unmarshal(values []*Value, results []any) error {
 
 func Load(args ...*Value) error {
 	type data struct {
-		cli      IClient
 		typeData uint32
 		key      string
+		cli      IClient
 		values   []*Value
 		args     []string
 	}

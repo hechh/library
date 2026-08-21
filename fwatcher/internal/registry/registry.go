@@ -1,19 +1,16 @@
 package registry
 
 import (
-	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/hechh/library/base/fileutil"
 	"github.com/hechh/library/fwatcher/internal/parser"
-	"github.com/hechh/library/mlog"
 )
 
 var (
+	files   = make(map[string]*parser.FileInfo)
 	parsers = make(map[string]parser.IParser)
 )
 
@@ -29,57 +26,45 @@ func RegisterChange(sheet string, changeFunc func()) {
 	}
 }
 
-func Glob(pattern string) (map[string]string, error) {
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]string)
-	for _, filename := range matches {
-		sheet := strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
-		result[sheet] = filename
-	}
-	return result, nil
+func GetFileInfo(sheet string) *parser.FileInfo {
+	return files[sheet]
 }
 
-func Load(files map[string]string) error {
-	hh := md5.New()
+// 本地加载配置到内存
+func Load(files map[string]*parser.FileInfo) error {
 	for sheet, par := range parsers {
-		filename, ok := files[sheet]
+		file, ok := files[sheet]
 		if !ok {
-			return fmt.Errorf("config sheet %q not found", sheet)
+			return fmt.Errorf("配置文件不存在 sheet:%s", sheet)
 		}
 
-		// 读取文件内容
-		buf, err := os.ReadFile(filename)
-		if err != nil {
-			return err
-		}
-
-		// 解析配置
-		if err := par.Parse(hh, buf); err != nil {
-			mlog.Errorf("失败加载配置:%s，error:%v", filename, err)
+		if err := par.Parse(file); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func Save(sheet, filename string, body []byte) error {
-	parse, ok := parsers[sheet]
-	if !ok {
-		return fmt.Errorf("配置%s未编译注册", sheet)
-	}
-
-	ary, err := parse.New(body)
+// 获取所有需要上传的配置
+func Glob(pattern string) (map[string]*parser.FileInfo, error) {
+	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	text, err := json.Marshal(ary)
-	if err != nil {
-		return err
+	result := make(map[string]*parser.FileInfo)
+	for _, filename := range matches {
+		body, err := os.ReadFile(filename)
+		if err != nil {
+			return nil, err
+		}
+		sheet := strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
+		if item, ok := files[sheet]; !ok {
+			item := parser.NewFileInfo(filename, body)
+			files[sheet] = item
+			result[sheet] = item
+		} else if item.Update(body) {
+			result[sheet] = item
+		}
 	}
-
-	return fileutil.Save(filename, text)
+	return result, nil
 }

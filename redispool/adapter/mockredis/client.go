@@ -17,7 +17,7 @@ func New() *Client {
 	return new(Client)
 }
 
-func (m *Client) Init(cfg *redispool.DbConfig) error {
+func (m *Client) Init(cfg *redispool.Config) error {
 	m.Client = &goredis.Client{}
 	s, err := miniredis.Run()
 	if err != nil {
@@ -26,7 +26,7 @@ func (m *Client) Init(cfg *redispool.DbConfig) error {
 	m.miniredis = s
 
 	port, _ := strconv.Atoi(s.Port())
-	return m.Client.Init(&redispool.DbConfig{
+	return m.Client.Init(&redispool.Config{
 		Ip:     s.Host(),
 		Port:   uint32(port),
 		Db:     0,

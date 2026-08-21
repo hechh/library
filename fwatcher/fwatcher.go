@@ -1,13 +1,17 @@
 package fwatcher
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/hechh/library/base/fileutil"
+	"github.com/hechh/library/base/logic"
+	"github.com/hechh/library/base/safe"
 	"github.com/hechh/library/fwatcher/internal/registry"
-	"github.com/hechh/library/fwatcher/internal/watcher"
 	"github.com/hechh/library/mlog"
 )
 
@@ -18,6 +22,7 @@ type EtcdConfig struct {
 }
 
 type Config struct {
+	IsSync   bool        `yaml:"-"`                   // 是否开启配置同步
 	DataPath string      `yaml:"data_path,omitempty"` // 数据文件目录
 	XlsxPath string      `yaml:"xlsx_path,omitempty"` // Excel 文件目录
 	Ext      string      `yaml:"ext,omitempty"`       // 文件扩展名
@@ -28,6 +33,7 @@ type Config struct {
 type ISync interface {
 	Init(*Config) error
 	Close()
+	Clear() error
 	Put(string, []byte) error
 	Update(string, []byte) error
 	Delete(string) error
@@ -36,67 +42,153 @@ type ISync interface {
 
 // Fwatcher 文件监听器
 type Fwatcher struct {
-	local   *watcher.Watcher // 本地监听
-	sync    ISync            // 远程同步
-	newFunc func() ISync
+	newFunc   func() ISync
+	pattern   string            // 匹配模式
+	abspath   string            // 配置路径
+	cfg       *Config           // 配置
+	sync      ISync             // 远程同步
+	fswatcher *fsnotify.Watcher // 监听
+	exitCh    chan struct{}     // 退出
 }
 
 func NewFwatcher[T ISync](f func() T) *Fwatcher {
 	return &Fwatcher{
-		newFunc: func() ISync {
-			if f != nil {
-				return f()
-			}
-			return nil
-		},
+		newFunc: func() ISync { return f() },
+		exitCh:  make(chan struct{}),
+	}
+}
+
+func (d *Fwatcher) save(path string, body []byte) {
+	// 删除事件（body==nil）：清空等内部操作触发，忽略避免破坏本地文件
+	if body == nil {
+		return
+	}
+	sheet := strings.TrimPrefix(path, d.cfg.Etcd.Prefix+"/")
+	filename := filepath.Join(d.abspath, sheet+d.cfg.Ext)
+
+	// 落地保存：内容一致则跳过，否则（含文件不存在/其他读取错误）统一写入
+	old, err := os.ReadFile(filename)
+	if err == nil && bytes.Equal(old, body) {
+		return
+	}
+	if err != nil && !os.IsNotExist(err) {
+		mlog.Warnf("读取本地配置(%s)失败: %v", filename, err)
+	}
+	if err := fileutil.Save(filename, body); err != nil {
+		mlog.Errorf("收到同步配置，但是保存失败 error=%v", err)
 	}
 }
 
 func (d *Fwatcher) Init(cfg *Config) error {
 	// 确保数据目录存在（远程同步写文件与本地监听都依赖它）
-	abspath, err := filepath.Abs(cfg.DataPath)
+	var err error
+	d.cfg = cfg
+	if d.abspath, err = filepath.Abs(cfg.DataPath); err != nil {
+		return err
+	}
+	if err = fileutil.EnsureDir(d.abspath); err != nil {
+		return err
+	}
+	d.pattern = fmt.Sprintf("%s/*%s", d.abspath, cfg.Ext)
+
+	// 建立连接
+	d.sync = d.newFunc()
+	if err := d.sync.Init(cfg); err != nil {
+		return err
+	}
+	if cfg.IsSync {
+		if err := d.sync.Clear(); err != nil {
+			return err
+		}
+	}
+	// 建立远程配置变更监听
+	if err := d.sync.Watch(d.save); err != nil {
+		return err
+	}
+
+	// 获取所有变更配置
+	files, err := registry.Glob(d.pattern)
 	if err != nil {
 		return err
 	}
-	if err := fileutil.EnsureDir(abspath); err != nil {
-		return err
-	}
 
-	// 第一步：先初始化远程同步，把远程最新配置同步到本地
-	d.sync = d.newFunc()
-	if cfg.Etcd != nil && d.sync != nil {
-		if err := d.sync.Init(cfg); err != nil {
-			return err
-		}
-		// Watch 内部会先同步拉取一次远程全量配置（阻塞完成），再异步监听后续变更
-		if err := d.sync.Watch(func(sheet string, body []byte) {
-			// 回调的 sheet 是 etcd 完整 key(prefix/表名)，剥离前缀得到表名
-			name := strings.TrimPrefix(sheet, cfg.Etcd.Prefix+"/")
-			filename := filepath.Join(abspath, name+cfg.Ext)
-			if err := registry.Save(name, filename, body); err != nil {
-				mlog.Warnf("收到同步配置，但是保存失败 error=%v", err)
+	// 同步配置：先清空 etcd 中所有 kv，再全量上传本地配置，保证 etcd 与本地一致
+	if cfg.IsSync {
+		for sheet, file := range files {
+			if err := d.sync.Put(sheet, file.GetText()); err != nil {
+				return err
 			}
-		}); err != nil {
-			return err
 		}
 	}
 
-	// 第二步：再启动本地监听（此时本地文件已是远程同步后的最新版本）
-	d.local = watcher.NewWatcher(cfg.DataPath, cfg.Ext)
-	if err := d.local.Init(); err != nil {
+	// 建立监听目录
+	if d.fswatcher, err = fsnotify.NewWatcher(); err != nil {
+		return err
+	}
+	if err = d.fswatcher.Add(d.abspath); err != nil {
 		return err
 	}
 
+	// 加载配置
+	if err := registry.Load(files); err != nil {
+		return err
+	}
+	// 监听本地目录文件变更
+	safe.SafeGo(mlog.Fatalf, d.watch)
 	return nil
 }
 
 func (d *Fwatcher) Close() {
+	close(d.exitCh)
 	if d.sync != nil {
 		d.sync.Close()
 	}
-	d.local.Close()
 }
 
+func (d *Fwatcher) watch() {
+	defer d.fswatcher.Close()
+	for {
+		select {
+		case <-d.exitCh:
+			return
+		case event, ok := <-d.fswatcher.Events:
+			if !ok {
+				return
+			}
+			if logic.Has(event.Op, fsnotify.Write) || logic.Has(event.Op, fsnotify.Create) {
+				files, err := registry.Glob(d.pattern)
+				if err != nil {
+					mlog.Errorf("配置文件读取失败 abspath:%s, error=%v", d.abspath, err)
+					continue
+				}
+
+				// 同步：先清空 etcd 中所有 kv，再全量上传本地配置
+				if d.cfg.IsSync {
+					for sheet, file := range files {
+						if err := d.sync.Put(sheet, file.GetText()); err != nil {
+							mlog.Errorf("同步游戏配置失败，sheet:%s, error:%v", sheet, err)
+						}
+					}
+				}
+
+				// 重新加载到内存
+				if err := registry.Load(files); err != nil {
+					mlog.Errorf("游戏配置加载失败 error=%v", err)
+				}
+			}
+		}
+	}
+}
+
+// Clear 清空 etcd 中所有配置（发布前清理残留）。
+func (d *Fwatcher) Clear() error {
+	if d.sync == nil {
+		return fmt.Errorf("配置同步服务未初始化")
+	}
+	return d.sync.Clear()
+}
+
+// Put 上传配置到 etcd。
 func (d *Fwatcher) Put(key string, msg []byte) error {
 	if d.sync == nil {
 		return fmt.Errorf("配置同步服务未初始化")
@@ -104,6 +196,7 @@ func (d *Fwatcher) Put(key string, msg []byte) error {
 	return d.sync.Put(key, msg)
 }
 
+// Update 更新配置到 etcd（key 不存在时报错）。
 func (d *Fwatcher) Update(key string, msg []byte) error {
 	if d.sync == nil {
 		return fmt.Errorf("配置同步服务未初始化")
@@ -111,6 +204,7 @@ func (d *Fwatcher) Update(key string, msg []byte) error {
 	return d.sync.Update(key, msg)
 }
 
+// Delete 删除 etcd 中的配置。
 func (d *Fwatcher) Delete(key string) error {
 	if d.sync == nil {
 		return fmt.Errorf("配置同步服务未初始化")

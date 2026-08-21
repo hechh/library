@@ -60,6 +60,24 @@ func (d *EtcdSync) Put(sheet string, body []byte) error {
 	return nil
 }
 
+// Clear 清空 prefix 下所有 kv（用于全量同步前清理残留配置）。
+func (d *EtcdSync) Clear() error {
+	// 防御：prefix 为空时拒绝清空，避免误删整个 etcd（含集群节点注册）
+	if d.prefix == "" {
+		return fmt.Errorf("etcd prefix 为空，拒绝清空")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := d.client.Delete(ctx, d.prefix, clientv3.WithPrefix())
+	if err != nil {
+		return fmt.Errorf("etcd clear: %w", err)
+	}
+	mlog.Tracef("清空配置(%s)成功", d.prefix)
+	return nil
+}
+
 func (d *EtcdSync) Update(sheet string, body []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -91,6 +109,26 @@ func (d *EtcdSync) Delete(sheet string) error {
 		return fmt.Errorf("etcd delete: %w", err)
 	}
 	mlog.Tracef("删除配置(%s)成功", topic)
+	return nil
+}
+
+// Fetch 拉取 prefix 下所有 kv 并逐个回调（用于消费者模式初始化时从 etcd 同步全量配置到本地）。
+func (d *EtcdSync) Fetch(f func(string, []byte)) error {
+	// 防御：prefix 为空时拒绝拉取
+	if d.prefix == "" {
+		return fmt.Errorf("etcd prefix 为空，拒绝拉取")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	rsp, err := d.client.Get(ctx, d.prefix, clientv3.WithPrefix())
+	if err != nil {
+		return fmt.Errorf("etcd fetch: %w", err)
+	}
+
+	for _, ev := range rsp.Kvs {
+		f(string(ev.Key), ev.Value)
+	}
 	return nil
 }
 
@@ -127,15 +165,14 @@ func (e *EtcdSync) Watch(f func(string, []byte)) error {
 }
 
 func (e *EtcdSync) watch(f func(string, []byte)) (clientv3.WatchChan, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	rsp, err := e.client.Get(ctx, e.prefix, clientv3.WithPrefix())
-	if err != nil {
-		return nil, fmt.Errorf("etcd discovery get: %w", err)
+	// 防御：prefix 为空时拒绝监听，避免拉取/监听整个 etcd（含集群节点数据）
+	if e.prefix == "" {
+		return nil, fmt.Errorf("etcd prefix 为空，拒绝监听")
 	}
 
-	for _, ev := range rsp.Kvs {
-		f(string(ev.Key), ev.Value)
+	// 先拉取一次全量配置并回调（初始同步）
+	if err := e.Fetch(f); err != nil {
+		return nil, err
 	}
 
 	watchCh := e.client.Watch(context.Background(), e.prefix, clientv3.WithPrefix())

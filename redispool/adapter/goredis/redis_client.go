@@ -31,7 +31,7 @@ func handleRedisError(err error) error {
 
 func (d *Client) UniqueId() uint32 { return d.uuid }
 
-func (d *Client) Init(cfg *redispool.DbConfig) error {
+func (d *Client) Init(cfg *redispool.Config) error {
 	cli := redis.NewClient(&redis.Options{
 		IdleTimeout:        1 * time.Minute,
 		MinIdleConns:       100,
@@ -58,8 +58,7 @@ func (d *Client) Init(cfg *redispool.DbConfig) error {
 		cli.Close()
 		return fmt.Errorf("redis ping: %w", err)
 	}
-
-	d.uuid = utils.GetCrc32(fmt.Sprintf("%s-%d-%d", cfg.DbName, cfg.Db, cfg.ShardsId))
+	d.uuid = utils.GetCrc32(fmt.Sprintf("%s-%d", cfg.DbName, cfg.Db))
 	d.Client = cli
 	d.prefix = cfg.Prefix
 	return nil

@@ -12,7 +12,7 @@ import (
 func newTestClient(t *testing.T) *Client {
 	t.Helper()
 	c := New()
-	if err := c.Init(&redispool.DbConfig{
+	if err := c.Init(&redispool.Config{
 		Db:     0,
 		Prefix: "test",
 	}); err != nil {
@@ -36,7 +36,7 @@ func TestNew(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	c := New()
-	if err := c.Init(&redispool.DbConfig{
+	if err := c.Init(&redispool.Config{
 		Db:     0,
 		Prefix: "test",
 	}); err != nil {
@@ -64,7 +64,7 @@ func TestInit(t *testing.T) {
 func TestInitTwice(t *testing.T) {
 	c := newTestClient(t)
 	// 第二次 Init 应该正常（重新连接）
-	if err := c.Init(&redispool.DbConfig{
+	if err := c.Init(&redispool.Config{
 		Db:     1,
 		Prefix: "test2",
 	}); err != nil {

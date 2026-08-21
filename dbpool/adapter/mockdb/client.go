@@ -26,7 +26,7 @@ func New() *Client {
 	return &Client{}
 }
 
-func (m *Client) Init(cfg *dbpool.DbConfig, tables ...any) error {
+func (m *Client) Init(cfg *dbpool.Config, tables ...any) error {
 	// 使用原子递增序号生成唯一 URI，确保每个 Client 实例拥有独立的数据库
 	seq := mockClientSeq.Add(1)
 	dsn := fmt.Sprintf("file:%s_%d?mode=memory&cache=shared", cfg.DbName, seq)

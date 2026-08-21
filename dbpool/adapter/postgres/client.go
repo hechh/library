@@ -25,7 +25,7 @@ func NewClient() *Client {
 	return &Client{}
 }
 
-func (d *Client) Init(cfg *dbpool.DbConfig, tables ...any) error {
+func (d *Client) Init(cfg *dbpool.Config, tables ...any) error {
 	d.dsn = append(d.dsn,
 		fmt.Sprintf(
 			"postgresql://%s:%s@%s:%d/%s?sslmode=disable",
